@@ -1,26 +1,95 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@theme {
+  /* ── Fonts ── */
+  --font-display: var(--font-chatime), Georgia, serif;
+  --font-sans: var(--font-inter-tight), system-ui, sans-serif;
+
+  /* ── Brand core ── */
+  --color-pine: #064733;
+  --color-rust: #9a4316;
+  --color-amber: #e08a1f;  /* Final — highlight / warning / kanban QC */
+
+  /* ── Pine ramp ── */
+  --color-pine-50: #edf3f0;
+  --color-pine-100: #d3e2db;
+  --color-pine-200: #a6c4b6;
+  --color-pine-300: #6f9d89;
+  --color-pine-400: #357a61;
+  --color-pine-500: #064733;
+  --color-pine-700: #053322;
+  --color-pine-800: #03241a;
+  --color-pine-900: #021a12;
+
+  /* ── Rust ramp ── */
+  --color-rust-50: #fbf0e9;
+  --color-rust-100: #f3dccb;
+  --color-rust-200: #e4b794;
+  --color-rust-300: #d08f5c;
+  --color-rust-400: #b3672e;
+  --color-rust-500: #9a4316;
+  --color-rust-600: #843813;
+  --color-rust-700: #6a2c10;
+
+  /* ── Sand (background / surface) ── */
+  --color-sand-50: #faf7f0;
+  --color-sand-100: #f4eee2;
+  --color-sand-200: #ece2cd;
+  --color-sand-300: #ddccac;
+  --color-sand-400: #c4b393;
+
+  /* ── Ink (text) ── */
+  --color-ink-900: #1d1610;
+  --color-ink-700: #3d3128;
+  --color-ink-500: #6f6256;
+  --color-ink-400: #948675;
+
+  /* ── Lines ── */
+  --color-line: #e6ddcc;
+  --color-line-strong: #d3c8b2;
+
+  /* ── Semantic ── */
+  --color-success: #6f8a3f;
+  --color-success-bg: #eef2e2;
+  --color-success-bd: #d6dfba;
+  --color-warning: #b5751a;
+  --color-warning-bg: #fbf0df;
+  --color-warning-bd: #f0d6a6;
+  --color-danger: #b42318;
+  --color-danger-bg: #fbe9e7;
+  --color-danger-bd: #f3c9c4;
+  --color-info: #064733;
+  --color-info-bg: #e7efeb;
+  --color-info-bd: #c6dad0;
+
+  /* ── Radius ── */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 22px;
+  --radius-full: 9999px;
+
+  /* ── Elevation (warm undertone) ── */
+  --shadow-sm: 0 1px 2px rgba(86,39,19,.06), 0 1px 1px rgba(86,39,19,.04);
+  --shadow-md: 0 4px 12px rgba(86,39,19,.08), 0 2px 4px rgba(86,39,19,.05);
+  --shadow-lg: 0 14px 36px rgba(86,39,19,.13), 0 4px 10px rgba(86,39,19,.06);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* ── Base ── */
+html {
+  background-color: var(--color-sand-50);
+  color: var(--color-ink-900);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* Chatime only for display — enforced here, not in @theme utility */
+.font-display {
+  font-family: var(--font-display);
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* Numeric tables */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
 }
