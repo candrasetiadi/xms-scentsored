@@ -229,9 +229,9 @@ export type Database = {
       }
       // ── M8 Booking ─────────────────────────────────────────────────────────
       consultation_slots: {
-        Row: { id: string; branch_id: string; date: string; start_time: string; end_time: string; max_bookings: number; notes: string | null; is_active: boolean; created_at: string }
-        Insert: { id?: string; branch_id: string; date: string; start_time: string; end_time: string; max_bookings?: number; notes?: string | null; is_active?: boolean; created_at?: string }
-        Update: { date?: string; start_time?: string; end_time?: string; max_bookings?: number; notes?: string | null; is_active?: boolean }
+        Row: { id: string; branch_id: string; date: string; start_time: string; end_time: string; max_bookings: number; notes: string | null; is_active: boolean; calendar_event_id: string | null; created_at: string }
+        Insert: { id?: string; branch_id: string; date: string; start_time: string; end_time: string; max_bookings?: number; notes?: string | null; is_active?: boolean; calendar_event_id?: string | null; created_at?: string }
+        Update: { date?: string; start_time?: string; end_time?: string; max_bookings?: number; notes?: string | null; is_active?: boolean; calendar_event_id?: string | null }
         Relationships: []
       }
       consultation_bookings: {

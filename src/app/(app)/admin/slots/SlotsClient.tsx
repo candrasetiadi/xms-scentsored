@@ -17,7 +17,30 @@ interface Booking {
   notes: string | null; queue_number: number; created_at: string
 }
 
-const fmtDate = (d: string) => new Date(d).toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short' })
+const DAYS_ID = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab']
+const MONTHS_ID = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des']
+
+// Deterministic date formatter (hindari hydration mismatch dengan toLocaleDateString)
+function fmtDate(d: string) {
+  const dt  = new Date(d + 'T00:00:00')
+  const day = DAYS_ID[dt.getDay()]
+  return `${day}, ${dt.getDate()} ${MONTHS_ID[dt.getMonth()]}`
+}
+
+// Default jadwal: 4 sesi × 1.5 jam, 16 orang
+const DEFAULT_SESSIONS = [
+  { start_time: '09:00', end_time: '10:30', label: 'Sesi 1' },
+  { start_time: '12:00', end_time: '13:30', label: 'Sesi 2' },
+  { start_time: '15:00', end_time: '16:30', label: 'Sesi 3' },
+  { start_time: '18:00', end_time: '19:30', label: 'Sesi 4' },
+]
+
+function todayStr() { return new Date().toISOString().slice(0, 10) }
+function weeksLater(n: number) {
+  const d = new Date()
+  d.setDate(d.getDate() + n * 7)
+  return d.toISOString().slice(0, 10)
+}
 
 export function SlotsClient({ branches, defaultBranchId }: { branches: Branch[]; defaultBranchId: string | null }) {
   const [branchId,  setBranchId]  = useState(defaultBranchId ?? '')
@@ -27,17 +50,27 @@ export function SlotsClient({ branches, defaultBranchId }: { branches: Branch[];
   const [bookings,  setBookings]  = useState<Booking[]>([])
   const [bookingsLoading, setBookingsLoading] = useState(false)
 
-  // Create modal
+  // Modal: buat slot satuan
   const [showCreate, setShowCreate] = useState(false)
-  const [form, setForm] = useState({ date: '', start_time: '10:00', end_time: '11:00', max_bookings: 5, notes: '' })
+  const [form, setForm] = useState({ date: '', start_time: '09:00', end_time: '10:30', max_bookings: 16, notes: '' })
   const [creating, setCreating] = useState(false)
   const [createErr, setCreateErr] = useState('')
+
+  // Modal: generate jadwal bulk
+  const [showGenerate, setShowGenerate]   = useState(false)
+  const [genFrom,      setGenFrom]        = useState(todayStr)
+  const [genTo,        setGenTo]          = useState(() => weeksLater(4))
+  const [genMaxBook,   setGenMaxBook]     = useState(16)
+  const [genSkipWeek,  setGenSkipWeek]    = useState(false)
+  const [generating,   setGenerating]     = useState(false)
+  const [generateResult, setGenerateResult] = useState<{ created: number; skipped: number } | null>(null)
+  const [generateErr,  setGenerateErr]    = useState('')
 
   const loadSlots = useCallback(async () => {
     if (!branchId) return
     setLoading(true)
-    const from = new Date().toISOString().slice(0, 10)
-    const to   = new Date(Date.now() + 60 * 86400_000).toISOString().slice(0, 10)
+    const from = todayStr()
+    const to   = weeksLater(8)
     const res  = await fetch(`/api/v1/consultation-slots?branch_id=${branchId}&from=${from}&to=${to}`)
     const json = await res.json()
     setSlots(json.data ?? [])
@@ -60,8 +93,7 @@ export function SlotsClient({ branches, defaultBranchId }: { branches: Branch[];
   }
 
   const createSlot = async () => {
-    setCreating(true)
-    setCreateErr('')
+    setCreating(true); setCreateErr('')
     const res = await fetch('/api/v1/consultation-slots', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -71,7 +103,27 @@ export function SlotsClient({ branches, defaultBranchId }: { branches: Branch[];
     setCreating(false)
     if (!res.ok) { setCreateErr(json.error?.message ?? 'Gagal.'); return }
     setShowCreate(false)
-    setForm({ date: '', start_time: '10:00', end_time: '11:00', max_bookings: 5, notes: '' })
+    setForm({ date: '', start_time: '09:00', end_time: '10:30', max_bookings: 16, notes: '' })
+    loadSlots()
+  }
+
+  const generateSlots = async () => {
+    setGenerating(true); setGenerateErr(''); setGenerateResult(null)
+    const res = await fetch('/api/v1/consultation-slots/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        branch_id:    branchId,
+        from:         genFrom,
+        to:           genTo,
+        max_bookings: genMaxBook,
+        skip_weekends: genSkipWeek,
+      }),
+    })
+    const json = await res.json()
+    setGenerating(false)
+    if (!res.ok) { setGenerateErr(json.error?.message ?? 'Gagal generate.'); return }
+    setGenerateResult(json.data)
     loadSlots()
   }
 
@@ -90,105 +142,172 @@ export function SlotsClient({ branches, defaultBranchId }: { branches: Branch[];
     loadSlots()
   }
 
+  // Group slots by date untuk tampilan yang lebih rapi
+  const slotsByDate = slots.reduce<Record<string, Slot[]>>((acc, slot) => {
+    if (!acc[slot.date]) acc[slot.date] = []
+    acc[slot.date].push(slot)
+    return acc
+  }, {})
+
   return (
-    <div className="min-h-screen" style={{ background: 'var(--color-surface)' }}>
-      <div className="max-w-5xl mx-auto px-4 py-6 space-y-4">
-        <div className="flex items-center justify-between gap-3">
-          <h1 className="text-xl font-semibold" style={{ color: 'var(--color-text-primary)' }}>Slot Booking Konsultasi</h1>
-          <div className="flex items-center gap-2">
+    <div className="min-h-screen bg-sand-50">
+      <div className="max-w-5xl mx-auto px-4 py-6 space-y-5">
+
+        {/* Header */}
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="font-display text-[28px] text-pine">Booking Konsultasi</h1>
+            <p className="text-sm text-ink-400 mt-0.5">Kelola slot jadwal dan lihat booking per sesi</p>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
             {branches.length > 1 && (
               <select value={branchId} onChange={e => setBranchId(e.target.value)}
-                className="rounded-lg px-3 py-1.5 text-sm border"
-                style={{ background: 'var(--color-surface-raised)', borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }}>
+                className="h-9 rounded-lg px-3 text-sm border border-line text-ink-900 bg-white">
                 {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
               </select>
             )}
-            <button onClick={() => { setShowCreate(true); setCreateErr('') }}
-              className="rounded-lg px-3 py-1.5 text-sm font-medium"
-              style={{ background: 'var(--color-primary)', color: '#fff' }}>
-              + Buat Slot
+            <button
+              onClick={() => { setShowGenerate(true); setGenerateResult(null); setGenerateErr('') }}
+              className="h-9 px-3 rounded-lg border border-pine text-pine text-sm font-medium hover:bg-pine-50 transition-colors">
+              ⚡ Generate Jadwal
+            </button>
+            <button
+              onClick={() => { setShowCreate(true); setCreateErr('') }}
+              className="h-9 px-3 rounded-lg bg-pine text-white text-sm font-medium hover:bg-pine-600 transition-colors">
+              + Slot Manual
             </button>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Slot list */}
-          <div className="space-y-2">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-5">
+
+          {/* Slot list — grouped by date */}
+          <div className="md:col-span-2 space-y-4">
             {loading ? (
-              <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>Memuat...</p>
-            ) : slots.length === 0 ? (
-              <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>Belum ada slot.</p>
-            ) : slots.map(slot => (
-              <button key={slot.id} onClick={() => selectSlot(slot)}
-                className="w-full text-left rounded-xl p-3 border transition-all"
-                style={{
-                  background:   selSlot?.id === slot.id ? 'var(--color-primary)' : 'var(--color-surface-raised)',
-                  borderColor:  selSlot?.id === slot.id ? 'var(--color-primary)' : 'var(--color-border)',
-                  color:        selSlot?.id === slot.id ? '#fff' : 'var(--color-text-primary)',
-                }}>
-                <p className="font-medium text-sm">{fmtDate(slot.date)}</p>
-                <p className="text-xs opacity-70">{slot.start_time.slice(0,5)} – {slot.end_time.slice(0,5)}</p>
-                <p className="text-xs mt-1 opacity-80">{slot.filled}/{slot.max_bookings} booking</p>
-              </button>
-            ))}
+              <p className="text-sm text-ink-400 py-4">Memuat jadwal...</p>
+            ) : Object.keys(slotsByDate).length === 0 ? (
+              <div className="bg-white border border-line rounded-xl p-6 text-center">
+                <p className="text-sm text-ink-500 mb-1">Belum ada slot</p>
+                <p className="text-xs text-ink-400">Gunakan "Generate Jadwal" untuk buat otomatis</p>
+              </div>
+            ) : (
+              Object.entries(slotsByDate).map(([date, daySlots]) => (
+                <div key={date}>
+                  <p className="text-xs font-semibold text-ink-400 uppercase tracking-wider mb-1.5 px-1">
+                    {fmtDate(date)}
+                  </p>
+                  <div className="space-y-1.5">
+                    {daySlots.map(slot => {
+                      const pct   = slot.max_bookings > 0 ? slot.filled / slot.max_bookings : 0
+                      const full  = slot.filled >= slot.max_bookings
+                      const isSelected = selSlot?.id === slot.id
+                      return (
+                        <button key={slot.id} onClick={() => selectSlot(slot)}
+                          className={[
+                            'w-full text-left rounded-xl p-3 border transition-all',
+                            isSelected
+                              ? 'bg-pine border-pine text-white'
+                              : 'bg-white border-line hover:border-pine-200',
+                          ].join(' ')}>
+                          <div className="flex items-center justify-between gap-2">
+                            <span className={`text-sm font-medium ${isSelected ? 'text-white' : 'text-ink-900'}`}>
+                              {slot.start_time.slice(0, 5)} – {slot.end_time.slice(0, 5)}
+                            </span>
+                            {full ? (
+                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                                isSelected ? 'bg-white/20 text-white' : 'bg-danger-bg text-danger'
+                              }`}>PENUH</span>
+                            ) : (
+                              <span className={`text-xs ${isSelected ? 'text-white/70' : 'text-ink-400'}`}>
+                                {slot.available} tersisa
+                              </span>
+                            )}
+                          </div>
+                          {/* Progress bar */}
+                          <div className={`mt-1.5 h-1 rounded-full overflow-hidden ${isSelected ? 'bg-white/20' : 'bg-sand-200'}`}>
+                            <div
+                              className={`h-full rounded-full transition-all ${full ? 'bg-danger' : isSelected ? 'bg-white' : 'bg-pine'}`}
+                              style={{ width: `${Math.min(pct * 100, 100)}%` }}
+                            />
+                          </div>
+                          <p className={`text-xs mt-1 ${isSelected ? 'text-white/60' : 'text-ink-400'}`}>
+                            {slot.filled}/{slot.max_bookings} booking
+                          </p>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))
+            )}
           </div>
 
           {/* Booking detail */}
-          <div className="md:col-span-2">
+          <div className="md:col-span-3">
             {!selSlot ? (
-              <div className="rounded-xl border p-8 text-center"
-                style={{ background: 'var(--color-surface-raised)', borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}>
-                <p className="text-sm">Pilih slot untuk melihat booking</p>
+              <div className="bg-white border border-line rounded-xl p-10 text-center h-full flex flex-col items-center justify-center gap-2">
+                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-ink-300">
+                  <rect x="4" y="6" width="24" height="22" rx="2"/>
+                  <path d="M22 4v4M10 4v4M4 14h24"/>
+                  <path d="M10 20h4M10 24h8" strokeLinecap="round"/>
+                </svg>
+                <p className="text-sm text-ink-500">Pilih slot untuk melihat detail booking</p>
               </div>
             ) : (
-              <div className="rounded-xl border overflow-hidden"
-                style={{ background: 'var(--color-surface-raised)', borderColor: 'var(--color-border)' }}>
-                <div className="flex items-start justify-between p-4 border-b" style={{ borderColor: 'var(--color-border)' }}>
+              <div className="bg-white border border-line rounded-xl overflow-hidden">
+                {/* Slot header */}
+                <div className="flex items-start justify-between p-4 border-b border-line bg-sand-50">
                   <div>
-                    <p className="font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+                    <p className="font-semibold text-ink-900">
                       {fmtDate(selSlot.date)} · {selSlot.start_time.slice(0,5)}–{selSlot.end_time.slice(0,5)}
                     </p>
-                    <p className="text-sm mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>
-                      {selSlot.filled}/{selSlot.max_bookings} booking
-                    </p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-sm text-ink-500">{selSlot.filled}/{selSlot.max_bookings} booking</span>
+                      {selSlot.filled >= selSlot.max_bookings && (
+                        <span className="text-[11px] font-bold bg-danger-bg text-danger px-1.5 py-0.5 rounded-full">PENUH</span>
+                      )}
+                    </div>
                   </div>
                   <button onClick={() => deactivateSlot(selSlot.id)}
-                    className="text-xs px-2 py-1 rounded-lg"
-                    style={{ color: 'var(--color-error)', background: 'var(--color-error-bg)' }}>
+                    className="text-xs px-2.5 py-1 rounded-lg border border-danger-bd text-danger hover:bg-danger-bg transition-colors">
                     Nonaktifkan
                   </button>
                 </div>
 
+                {/* Booking list */}
                 {bookingsLoading ? (
-                  <p className="p-4 text-sm" style={{ color: 'var(--color-text-secondary)' }}>Memuat...</p>
+                  <p className="p-6 text-sm text-ink-400 text-center">Memuat...</p>
                 ) : bookings.length === 0 ? (
-                  <p className="p-4 text-sm text-center" style={{ color: 'var(--color-text-secondary)' }}>Belum ada booking.</p>
+                  <div className="p-8 text-center">
+                    <p className="text-sm text-ink-400">Belum ada booking untuk sesi ini</p>
+                  </div>
                 ) : (
-                  <div className="divide-y" style={{ borderColor: 'var(--color-border)' }}>
+                  <div className="divide-y divide-line">
                     {bookings.map(b => (
-                      <div key={b.id} className="flex items-center justify-between gap-2 px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          <span className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold"
-                            style={{ background: b.status === 'cancelled' ? 'var(--color-border)' : 'var(--color-primary)', color: '#fff' }}>
+                      <div key={b.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <span className={[
+                            'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0',
+                            b.status === 'cancelled' ? 'bg-sand-200 text-ink-400' : 'bg-pine text-white'
+                          ].join(' ')}>
                             {b.queue_number}
                           </span>
-                          <div>
-                            <p className="text-sm font-medium" style={{ color: b.status === 'cancelled' ? 'var(--color-text-secondary)' : 'var(--color-text-primary)', textDecoration: b.status === 'cancelled' ? 'line-through' : 'none' }}>
+                          <div className="min-w-0">
+                            <p className={`text-sm font-medium truncate ${
+                              b.status === 'cancelled' ? 'text-ink-400 line-through' : 'text-ink-900'
+                            }`}>
                               {b.customer_name}
                             </p>
-                            <p className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>{b.customer_phone}</p>
+                            <p className="text-xs text-ink-400">{b.customer_phone}</p>
                           </div>
                         </div>
-                        {b.status === 'confirmed' && (
+                        {b.status === 'confirmed' ? (
                           <button onClick={() => cancelBooking(b.id)}
-                            className="text-xs px-2 py-1 rounded-lg"
-                            style={{ color: 'var(--color-error)', background: 'var(--color-error-bg)' }}>
+                            className="text-xs px-2 py-1 rounded-lg border border-danger-bd text-danger hover:bg-danger-bg transition-colors shrink-0">
                             Batalkan
                           </button>
-                        )}
-                        {b.status === 'cancelled' && (
-                          <span className="text-xs px-2 py-1 rounded-full"
-                            style={{ background: 'var(--color-border)', color: 'var(--color-text-secondary)' }}>
+                        ) : (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-sand-100 text-ink-400 shrink-0">
                             Dibatalkan
                           </span>
                         )}
@@ -202,62 +321,144 @@ export function SlotsClient({ branches, defaultBranchId }: { branches: Branch[];
         </div>
       </div>
 
-      {/* Modal buat slot */}
-      {showCreate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.5)' }}>
-          <div className="w-full max-w-sm rounded-2xl p-6 space-y-4" style={{ background: 'var(--color-surface-raised)' }}>
-            <h2 className="font-semibold" style={{ color: 'var(--color-text-primary)' }}>Buat Slot Baru</h2>
+      {/* ── Modal: Generate Jadwal ─────────────────────────────────── */}
+      {showGenerate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-900/40">
+          <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden">
+            <div className="px-6 py-4 border-b border-line">
+              <h2 className="font-semibold text-ink-900">Generate Jadwal Otomatis</h2>
+              <p className="text-xs text-ink-400 mt-0.5">Buat slot otomatis 4 sesi/hari, masing-masing 1,5 jam</p>
+            </div>
 
-            <div className="space-y-3">
+            <div className="px-6 py-5 space-y-4">
+              {/* Jadwal default info */}
+              <div className="bg-pine-50 border border-pine-100 rounded-xl p-3 space-y-1">
+                <p className="text-xs font-semibold text-pine mb-2">Sesi yang akan dibuat per hari:</p>
+                {DEFAULT_SESSIONS.map(s => (
+                  <div key={s.start_time} className="flex items-center gap-2 text-xs text-pine">
+                    <span className="w-14 font-medium">{s.label}</span>
+                    <span>{s.start_time} – {s.end_time}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Rentang tanggal */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-ink-600 block mb-1">Dari tanggal</label>
+                  <input type="date" value={genFrom} onChange={e => setGenFrom(e.target.value)}
+                    className="w-full h-9 rounded-lg border border-line-strong px-3 text-sm text-ink-900
+                               focus:outline-none focus:border-pine-400 focus:ring-2 focus:ring-pine-100" />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-ink-600 block mb-1">Sampai tanggal</label>
+                  <input type="date" value={genTo} onChange={e => setGenTo(e.target.value)}
+                    className="w-full h-9 rounded-lg border border-line-strong px-3 text-sm text-ink-900
+                               focus:outline-none focus:border-pine-400 focus:ring-2 focus:ring-pine-100" />
+                </div>
+              </div>
+
+              {/* Max booking */}
               <div>
-                <label className="text-xs font-medium block mb-1" style={{ color: 'var(--color-text-secondary)' }}>Tanggal</label>
+                <label className="text-xs font-medium text-ink-600 block mb-1">Kapasitas per sesi</label>
+                <input type="number" min={1} max={50} value={genMaxBook}
+                  onChange={e => setGenMaxBook(parseInt(e.target.value) || 16)}
+                  className="w-full h-9 rounded-lg border border-line-strong px-3 text-sm text-ink-900
+                             focus:outline-none focus:border-pine-400 focus:ring-2 focus:ring-pine-100" />
+              </div>
+
+              {/* Skip weekend */}
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input type="checkbox" checked={genSkipWeek}
+                  onChange={e => setGenSkipWeek(e.target.checked)}
+                  className="w-4 h-4 rounded accent-pine" />
+                <span className="text-sm text-ink-700">Lewati Sabtu & Minggu</span>
+              </label>
+
+              {/* Result / error */}
+              {generateResult && (
+                <div className="bg-success-bg border border-success-bd rounded-xl px-4 py-3 text-sm">
+                  <p className="font-semibold text-success">{generateResult.created} slot berhasil dibuat</p>
+                  {generateResult.skipped > 0 && (
+                    <p className="text-xs text-ink-500 mt-0.5">{generateResult.skipped} slot sudah ada, dilewati</p>
+                  )}
+                </div>
+              )}
+              {generateErr && (
+                <p className="text-sm text-danger bg-danger-bg border border-danger-bd rounded-xl px-4 py-3">{generateErr}</p>
+              )}
+            </div>
+
+            <div className="px-6 pb-5 flex gap-2">
+              <button onClick={() => { setShowGenerate(false); setGenerateResult(null) }}
+                disabled={generating}
+                className="flex-1 h-10 rounded-lg border border-line text-sm font-medium text-ink-700 hover:bg-sand-50 transition-colors">
+                {generateResult ? 'Tutup' : 'Batal'}
+              </button>
+              {!generateResult && (
+                <button onClick={generateSlots} disabled={generating}
+                  className="flex-1 h-10 rounded-lg bg-pine text-white text-sm font-medium hover:bg-pine-600 disabled:opacity-50 transition-colors">
+                  {generating ? 'Membuat...' : 'Generate'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal: Buat Slot Satuan ──────────────────────────────────── */}
+      {showCreate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-900/40">
+          <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl overflow-hidden">
+            <div className="px-5 py-4 border-b border-line">
+              <h2 className="font-semibold text-ink-900">Buat Slot Satuan</h2>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <div>
+                <label className="text-xs font-medium text-ink-600 block mb-1">Tanggal</label>
                 <input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
-                  className="w-full rounded-lg px-3 py-2 text-sm border"
-                  style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }} />
+                  className="w-full h-9 rounded-lg border border-line-strong px-3 text-sm text-ink-900
+                             focus:outline-none focus:border-pine-400 focus:ring-2 focus:ring-pine-100" />
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-xs font-medium block mb-1" style={{ color: 'var(--color-text-secondary)' }}>Mulai</label>
+                  <label className="text-xs font-medium text-ink-600 block mb-1">Mulai</label>
                   <input type="time" value={form.start_time} onChange={e => setForm(f => ({ ...f, start_time: e.target.value }))}
-                    className="w-full rounded-lg px-3 py-2 text-sm border"
-                    style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }} />
+                    className="w-full h-9 rounded-lg border border-line-strong px-3 text-sm text-ink-900
+                               focus:outline-none focus:border-pine-400 focus:ring-2 focus:ring-pine-100" />
                 </div>
                 <div>
-                  <label className="text-xs font-medium block mb-1" style={{ color: 'var(--color-text-secondary)' }}>Selesai</label>
+                  <label className="text-xs font-medium text-ink-600 block mb-1">Selesai</label>
                   <input type="time" value={form.end_time} onChange={e => setForm(f => ({ ...f, end_time: e.target.value }))}
-                    className="w-full rounded-lg px-3 py-2 text-sm border"
-                    style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }} />
+                    className="w-full h-9 rounded-lg border border-line-strong px-3 text-sm text-ink-900
+                               focus:outline-none focus:border-pine-400 focus:ring-2 focus:ring-pine-100" />
                 </div>
               </div>
               <div>
-                <label className="text-xs font-medium block mb-1" style={{ color: 'var(--color-text-secondary)' }}>Max Booking</label>
-                <input type="number" min={1} max={20} value={form.max_bookings}
-                  onChange={e => setForm(f => ({ ...f, max_bookings: parseInt(e.target.value) || 5 }))}
-                  className="w-full rounded-lg px-3 py-2 text-sm border"
-                  style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }} />
+                <label className="text-xs font-medium text-ink-600 block mb-1">Max Booking</label>
+                <input type="number" min={1} max={50} value={form.max_bookings}
+                  onChange={e => setForm(f => ({ ...f, max_bookings: parseInt(e.target.value) || 16 }))}
+                  className="w-full h-9 rounded-lg border border-line-strong px-3 text-sm text-ink-900
+                             focus:outline-none focus:border-pine-400 focus:ring-2 focus:ring-pine-100" />
               </div>
               <div>
-                <label className="text-xs font-medium block mb-1" style={{ color: 'var(--color-text-secondary)' }}>Catatan (opsional)</label>
+                <label className="text-xs font-medium text-ink-600 block mb-1">Catatan (opsional)</label>
                 <input type="text" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
-                  placeholder="e.g. Sesi 2 jam termasuk uji aroma"
-                  className="w-full rounded-lg px-3 py-2 text-sm border"
-                  style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }} />
+                  placeholder="e.g. Sesi khusus kelompok"
+                  className="w-full h-9 rounded-lg border border-line-strong px-3 text-sm text-ink-900
+                             focus:outline-none focus:border-pine-400 focus:ring-2 focus:ring-pine-100" />
               </div>
+              {createErr && (
+                <p className="text-sm text-danger bg-danger-bg border border-danger-bd rounded-lg px-3 py-2">{createErr}</p>
+              )}
             </div>
-
-            {createErr && (
-              <p className="text-sm rounded-lg px-3 py-2" style={{ background: 'var(--color-error-bg)', color: 'var(--color-error)' }}>{createErr}</p>
-            )}
-
-            <div className="flex gap-2">
+            <div className="px-5 pb-5 flex gap-2">
               <button onClick={() => setShowCreate(false)} disabled={creating}
-                className="flex-1 rounded-lg py-2 text-sm font-medium border"
-                style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)', background: 'var(--color-surface)' }}>
+                className="flex-1 h-10 rounded-lg border border-line text-sm font-medium text-ink-700 hover:bg-sand-50 transition-colors">
                 Batal
               </button>
               <button onClick={createSlot} disabled={creating}
-                className="flex-1 rounded-lg py-2 text-sm font-medium"
-                style={{ background: 'var(--color-primary)', color: '#fff', opacity: creating ? 0.6 : 1 }}>
+                className="flex-1 h-10 rounded-lg bg-pine text-white text-sm font-medium hover:bg-pine-600 disabled:opacity-50 transition-colors">
                 {creating ? 'Menyimpan...' : 'Buat Slot'}
               </button>
             </div>

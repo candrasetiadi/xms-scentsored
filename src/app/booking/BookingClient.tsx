@@ -27,9 +27,12 @@ interface BookingResult {
   end_time:     string
 }
 
-const fmtDate = (d: string) => new Date(d).toLocaleDateString('id-ID', {
-  weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
-})
+const DAYS_LONG   = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu']
+const MONTHS_LONG = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
+function fmtDate(d: string) {
+  const dt = new Date(d + 'T00:00:00')
+  return `${DAYS_LONG[dt.getDay()]}, ${dt.getDate()} ${MONTHS_LONG[dt.getMonth()]} ${dt.getFullYear()}`
+}
 
 export function BookingClient({ branches }: { branches: Branch[] }) {
   const [step,           setStep]           = useState<Step>('branch')

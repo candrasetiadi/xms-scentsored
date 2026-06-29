@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
+import { isGoogleCalendarConfigured, createSlotEvent } from '@/lib/google-calendar'
 
 // GET /api/v1/consultation-slots?branch_id=&from=&to=
 // Publik (anon) — ambil slot aktif untuk halaman booking
@@ -28,7 +30,6 @@ export async function GET(request: Request) {
   const { data, error } = await query
   if (error) return NextResponse.json({ error: { code: 'DB_ERROR', message: error.message } }, { status: 500 })
 
-  // Hitung sisa kuota per slot
   const result = (data ?? []).map(slot => {
     const bookings = ((slot.consultation_bookings ?? []) as unknown) as { status: string }[]
     const filled   = bookings.filter(b => b.status === 'confirmed').length
@@ -49,7 +50,7 @@ export async function GET(request: Request) {
   return NextResponse.json({ data: result })
 }
 
-// POST /api/v1/consultation-slots — buat slot baru (manager only)
+// POST /api/v1/consultation-slots — buat slot manual (manager only)
 export async function POST(request: Request) {
   const supabase = await createClient()
   const { data: { user }, error: authErr } = await supabase.auth.getUser()
@@ -75,20 +76,53 @@ export async function POST(request: Request) {
   if (!branchId)
     return NextResponse.json({ error: { code: 'VALIDATION', message: 'branch_id wajib.' } }, { status: 400 })
 
-  const { data, error } = await supabase
+  const admin = createAdminClient()
+
+  const { data: slot, error } = await admin
     .from('consultation_slots')
     .insert({
       branch_id:    branchId,
       date:         body.date,
       start_time:   body.start_time,
       end_time:     body.end_time,
-      max_bookings: body.max_bookings ?? 5,
+      max_bookings: body.max_bookings ?? 16,
       notes:        body.notes ?? null,
     })
-    .select()
+    .select('id, date, start_time, end_time, max_bookings')
     .single()
 
   if (error) return NextResponse.json({ error: { code: 'DB_ERROR', message: error.message } }, { status: 500 })
 
-  return NextResponse.json({ data }, { status: 201 })
+  // Buat Google Calendar event langsung
+  if (isGoogleCalendarConfigured()) {
+    createCalendarEventForSlot(admin, slot, branchId)
+      .catch(err => console.error('[Calendar] gagal buat event untuk slot manual:', err))
+  }
+
+  return NextResponse.json({ data: slot }, { status: 201 })
+}
+
+async function createCalendarEventForSlot(
+  admin: ReturnType<typeof createAdminClient>,
+  slot: { id: string; date: string; start_time: string; end_time: string; max_bookings: number },
+  branchId: string,
+) {
+  const { data: branch } = await admin
+    .from('branches').select('name').eq('id', branchId).single()
+  if (!branch) return
+
+  const eventId = await createSlotEvent({
+    slotDate:    slot.date,
+    startTime:   slot.start_time.slice(0, 5),
+    endTime:     slot.end_time.slice(0, 5),
+    branchName:  branch.name,
+    maxBookings: slot.max_bookings,
+  })
+
+  await admin
+    .from('consultation_slots')
+    .update({ calendar_event_id: eventId })
+    .eq('id', slot.id)
+
+  console.log(`[Calendar] Event dibuat untuk slot ${slot.id}: ${eventId}`)
 }

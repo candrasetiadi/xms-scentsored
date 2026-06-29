@@ -2,6 +2,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { sendBookingConfirmWa } from '@/lib/messaging'
+import { isGoogleCalendarConfigured, updateEventDescription } from '@/lib/google-calendar'
 
 // POST /api/v1/bookings — publik (anon), buat booking via DB function (anti-overbooking)
 export async function POST(request: Request) {
@@ -21,7 +22,7 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient()
   const { data, error } = await admin.rpc('check_and_create_booking', {
-    p_slot_id:       body.slot_id,
+    p_slot_id:        body.slot_id,
     p_customer_name:  body.customer_name,
     p_customer_phone: body.customer_phone,
     p_customer_email: body.customer_email ?? null,
@@ -40,12 +41,54 @@ export async function POST(request: Request) {
     slot_date:    string
     start_time:   string
     end_time:     string
+    max_bookings: number
+    filled:       number
   }
 
-  // Kirim WA konfirmasi (non-blocking)
+  // WA konfirmasi (non-blocking)
   sendBookingConfirmWa(result.booking_id).catch(() => {})
 
+  // Google Calendar (non-blocking)
+  if (isGoogleCalendarConfigured()) {
+    syncCalendar({ slotId: body.slot_id, maxBookings: result.max_bookings })
+      .catch(err => console.error('[Calendar] syncCalendar error:', err))
+  }
+
   return NextResponse.json({ data: result }, { status: 201 })
+}
+
+// syncCalendar: update deskripsi event yang sudah ada dengan semua booking aktif
+async function syncCalendar(opts: { slotId: string; maxBookings: number }) {
+  const admin = createAdminClient()
+
+  const { data: slot, error: slotErr } = await admin
+    .from('consultation_slots')
+    .select('calendar_event_id, branches!inner(name)')
+    .eq('id', opts.slotId)
+    .single()
+
+  if (slotErr) { console.error('[Calendar] gagal ambil slot:', slotErr.message); return }
+  if (!slot?.calendar_event_id) return  // slot belum punya event (generate sebelum fitur ini)
+
+  const { data: bookings } = await admin
+    .from('consultation_bookings')
+    .select('queue_number, customer_name, customer_phone')
+    .eq('slot_id', opts.slotId)
+    .eq('status', 'confirmed')
+    .order('queue_number')
+
+  await updateEventDescription({
+    eventId:     slot.calendar_event_id as string,
+    branchName:  ((slot.branches as unknown) as { name: string }).name,
+    maxBookings: opts.maxBookings,
+    bookings:    (bookings ?? []).map(b => ({
+      queueNumber: b.queue_number,
+      name:        b.customer_name,
+      phone:       b.customer_phone,
+    })),
+  })
+
+  console.log(`[Calendar] Updated event ${slot.calendar_event_id} (${bookings?.length ?? 0} booking)`)
 }
 
 // GET /api/v1/bookings?slot_id=&status= — manager only

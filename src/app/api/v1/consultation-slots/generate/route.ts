@@ -1,0 +1,144 @@
+import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { NextResponse } from 'next/server'
+import { isGoogleCalendarConfigured, createSlotEvent } from '@/lib/google-calendar'
+
+const DEFAULT_SESSIONS = [
+  { start_time: '09:00', end_time: '10:30' },
+  { start_time: '12:00', end_time: '13:30' },
+  { start_time: '15:00', end_time: '16:30' },
+  { start_time: '18:00', end_time: '19:30' },
+]
+
+// POST /api/v1/consultation-slots/generate
+export async function POST(request: Request) {
+  const supabase = await createClient()
+  const { data: { user }, error: authErr } = await supabase.auth.getUser()
+  if (authErr || !user)
+    return NextResponse.json({ error: { code: 'UNAUTHORIZED' } }, { status: 401 })
+
+  const { data: staff } = await supabase
+    .from('staff').select('role, branch_id').eq('auth_user_id', user.id).eq('active', true).single()
+  if (!staff || !['owner', 'admin'].includes(staff.role))
+    return NextResponse.json({ error: { code: 'FORBIDDEN' } }, { status: 403 })
+
+  let body: {
+    branch_id?: string
+    from: string
+    to: string
+    max_bookings?: number
+    sessions?: { start_time: string; end_time: string }[]
+    skip_weekends?: boolean
+  }
+  try { body = await request.json() } catch {
+    return NextResponse.json({ error: { code: 'VALIDATION', message: 'Body tidak valid.' } }, { status: 400 })
+  }
+
+  const branchId = body.branch_id ?? staff.branch_id
+  if (!branchId)
+    return NextResponse.json({ error: { code: 'VALIDATION', message: 'branch_id wajib.' } }, { status: 400 })
+  if (!body.from || !body.to)
+    return NextResponse.json({ error: { code: 'VALIDATION', message: 'from dan to wajib.' } }, { status: 400 })
+
+  const fromDate = new Date(body.from)
+  const toDate   = new Date(body.to)
+  if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime()) || fromDate > toDate)
+    return NextResponse.json({ error: { code: 'VALIDATION', message: 'Rentang tanggal tidak valid.' } }, { status: 400 })
+
+  const maxBookings  = body.max_bookings ?? 16
+  const sessions     = body.sessions ?? DEFAULT_SESSIONS
+  const skipWeekends = body.skip_weekends ?? false
+
+  const admin = createAdminClient()
+
+  // Ambil slot yang sudah ada agar bisa skip duplikat
+  const { data: existingSlots } = await admin
+    .from('consultation_slots')
+    .select('date, start_time')
+    .eq('branch_id', branchId)
+    .gte('date', body.from)
+    .lte('date', body.to)
+
+  const existingSet = new Set(
+    (existingSlots ?? []).map(s => `${s.date}|${s.start_time.slice(0, 5)}`)
+  )
+
+  // Build daftar slot baru
+  const toInsert: { branch_id: string; date: string; start_time: string; end_time: string; max_bookings: number; is_active: boolean }[] = []
+
+  const cur = new Date(fromDate)
+  while (cur <= toDate) {
+    const dow = cur.getDay()
+    if (!skipWeekends || (dow !== 0 && dow !== 6)) {
+      const dateStr = cur.toISOString().slice(0, 10)
+      for (const session of sessions) {
+        if (!existingSet.has(`${dateStr}|${session.start_time}`)) {
+          toInsert.push({ branch_id: branchId, date: dateStr, start_time: session.start_time, end_time: session.end_time, max_bookings: maxBookings, is_active: true })
+        }
+      }
+    }
+    cur.setDate(cur.getDate() + 1)
+  }
+
+  if (toInsert.length === 0) {
+    return NextResponse.json({ data: { created: 0, skipped: existingSlots?.length ?? 0 } })
+  }
+
+  const { data: inserted, error: insertErr } = await admin
+    .from('consultation_slots')
+    .insert(toInsert)
+    .select('id, date, start_time, end_time, max_bookings')
+
+  if (insertErr)
+    return NextResponse.json({ error: { code: 'DB_ERROR', message: insertErr.message } }, { status: 500 })
+
+  const totalDays = Math.round((toDate.getTime() - fromDate.getTime()) / 86400_000) + 1
+  const skipped   = totalDays * sessions.length - toInsert.length
+
+  // Buat Calendar events secara paralel (non-blocking — tidak tahan response)
+  if (isGoogleCalendarConfigured() && inserted && inserted.length > 0) {
+    createCalendarEventsInBatch(admin, inserted, branchId, maxBookings)
+      .catch(err => console.error('[Calendar] batch create error:', err))
+  }
+
+  return NextResponse.json({ data: { created: toInsert.length, skipped } }, { status: 201 })
+}
+
+async function createCalendarEventsInBatch(
+  admin: ReturnType<typeof createAdminClient>,
+  slots: { id: string; date: string; start_time: string; end_time: string; max_bookings: number }[],
+  branchId: string,
+  maxBookings: number,
+) {
+  const { data: branch } = await admin
+    .from('branches').select('name').eq('id', branchId).single()
+  if (!branch) return
+
+  const branchName = branch.name
+  const BATCH = 10  // maksimal paralel per batch agar tidak rate-limit
+
+  for (let i = 0; i < slots.length; i += BATCH) {
+    const batch = slots.slice(i, i + BATCH)
+    await Promise.allSettled(
+      batch.map(async slot => {
+        try {
+          const eventId = await createSlotEvent({
+            slotDate:    slot.date,
+            startTime:   slot.start_time.slice(0, 5),
+            endTime:     slot.end_time.slice(0, 5),
+            branchName,
+            maxBookings,
+          })
+          await admin
+            .from('consultation_slots')
+            .update({ calendar_event_id: eventId })
+            .eq('id', slot.id)
+        } catch (err) {
+          console.error(`[Calendar] gagal buat event untuk slot ${slot.id}:`, err)
+        }
+      })
+    )
+  }
+
+  console.log(`[Calendar] ${slots.length} events dibuat untuk branch ${branchName}`)
+}
