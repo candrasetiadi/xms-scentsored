@@ -44,9 +44,8 @@ interface Props {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function formatRp(n: number) {
-  return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n)
-}
+const _rp = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 })
+function formatRp(n: number) { return 'Rp ' + _rp.format(Math.round(n)) }
 
 const METHOD_LABEL: Record<PaymentMethod, string> = {
   cash:          'Tunai',

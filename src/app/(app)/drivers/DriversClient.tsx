@@ -36,7 +36,8 @@ interface Fee {
   accrued_at: string
 }
 
-const fmt = (n: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n)
+const _rp  = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 })
+const fmt  = (n: number) => 'Rp ' + _rp.format(Math.round(n))
 const fmtDate = (d: string) => new Date(d).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })
 const today = () => new Date().toISOString().slice(0, 10)
 const monthStart = () => { const d = new Date(); d.setDate(1); return d.toISOString().slice(0, 10) }

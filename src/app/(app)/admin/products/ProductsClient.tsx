@@ -12,9 +12,8 @@ const EMPTY: Omit<Product, 'id' | 'created_at'> = {
   sku: '', name: '', category: '', type: 'ready_stock', price: 0, image_url: null, active: true,
 }
 
-function formatRupiah(n: number) {
-  return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n)
-}
+const _rp = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 })
+function formatRupiah(n: number) { return 'Rp ' + _rp.format(Math.round(n)) }
 
 export function ProductsClient({ initialData }: { initialData: Product[] }) {
   const router = useRouter()

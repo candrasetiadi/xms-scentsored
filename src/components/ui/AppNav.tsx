@@ -73,34 +73,20 @@ function NotificationBell({ branchId }: BellProps) {
     try {
       const res  = await fetch(`/api/v1/notifications?unread_only=false&limit=20&branch_id=${branchId}`)
       const json = await res.json()
-      if (json.data) {
-        setNotifs(json.data)
-      } else if (json.error) {
-        console.error('[Notifications] API error:', json.error)
-      }
-    } catch (err) {
-      console.error('[Notifications] fetch error:', err)
+      if (json.data) setNotifs(json.data)
+    } catch {
+      // silent — bell is non-critical
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [branchId])
 
-  // Initial fetch
-  useEffect(() => { fetchNotifs() }, [fetchNotifs])
-
-  // Realtime: re-fetch on any new notification for this branch
+  // Fetch awal + polling 30 detik
   useEffect(() => {
     if (!branchId) return
-    const supabase = createClient()
-    const channel  = supabase
-      .channel('notifications-bell')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'notifications', filter: `branch_id=eq.${branchId}` },
-        () => fetchNotifs(),
-      )
-      .subscribe()
-    return () => { supabase.removeChannel(channel) }
+    fetchNotifs()
+    const interval = setInterval(fetchNotifs, 30_000)
+    return () => clearInterval(interval)
   }, [branchId, fetchNotifs])
 
   // Close dropdown on outside click

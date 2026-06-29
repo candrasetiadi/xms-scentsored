@@ -49,9 +49,8 @@ const STATUS_STYLE: Record<OrderStatus, string> = {
   cancelled:       'bg-danger-bg text-danger border-danger-bd',
 }
 
-function formatRp(n: number) {
-  return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n)
-}
+const _rp = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 })
+function formatRp(n: number) { return 'Rp ' + _rp.format(Math.round(n)) }
 
 function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' })

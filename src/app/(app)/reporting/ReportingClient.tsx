@@ -14,8 +14,8 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'driver-fees', label: 'Fee Driver' },
 ]
 
-const fmt = (n: number) =>
-  new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n)
+const _rp  = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 })
+const fmt  = (n: number) => 'Rp ' + _rp.format(Math.round(n))
 const fmtNum = (n: number) => new Intl.NumberFormat('id-ID').format(n)
 const fmtDate = (d: string) =>
   new Date(d).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })

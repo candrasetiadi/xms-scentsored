@@ -26,13 +26,10 @@ const STATUS_STYLE: Record<string, string> = {
 
 const STATUS_LABEL: Record<string, string> = { aman: 'Aman', rendah: 'Rendah', habis: 'Habis' }
 
-function formatRp(n: number) {
-  return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n)
-}
-
-function formatNum(n: number) {
-  return new Intl.NumberFormat('id-ID', { maximumFractionDigits: 3 }).format(n)
-}
+const _numFmt   = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 })
+const _numFmt3  = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 3 })
+function formatRp(n: number) { return 'Rp ' + _numFmt.format(Math.round(n)) }
+function formatNum(n: number) { return _numFmt3.format(n) }
 
 export function InventoryClient({
   staffId, staffRole, branchId, branches,

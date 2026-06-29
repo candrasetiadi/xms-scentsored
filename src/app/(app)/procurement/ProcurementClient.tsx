@@ -53,9 +53,8 @@ const STATUS_CLS: Record<PoStatus, string> = {
   cancelled:'bg-danger-bg text-danger',
 }
 
-function fmt(n: number) {
-  return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n)
-}
+const _rp = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 })
+function fmt(n: number) { return 'Rp ' + _rp.format(Math.round(n)) }
 
 function fmtDate(iso: string | null) {
   if (!iso) return '—'
