@@ -9,7 +9,7 @@ import type { Tables } from '@/types/database'
 type Product = Tables<'products'>
 
 const EMPTY: Omit<Product, 'id' | 'created_at'> = {
-  sku: '', name: '', category: '', type: 'ready_stock', price: 0, active: true,
+  sku: '', name: '', category: '', type: 'ready_stock', price: 0, image_url: null, active: true,
 }
 
 function formatRupiah(n: number) {
@@ -39,7 +39,7 @@ export function ProductsClient({ initialData }: { initialData: Product[] }) {
 
   function openEdit(p: Product) {
     setEditing(p)
-    setForm({ sku: p.sku, name: p.name, category: p.category ?? '', type: p.type, price: p.price, active: p.active })
+    setForm({ sku: p.sku, name: p.name, category: p.category ?? '', type: p.type, price: p.price, image_url: p.image_url ?? null, active: p.active })
     setError(null)
     setModalOpen(true)
   }

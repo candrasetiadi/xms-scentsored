@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { sendInvoiceWa } from '@/lib/messaging'
 
 const VALID_METHODS = ['cash', 'debit_card', 'credit_card', 'bank_transfer', 'qris'] as const
 type PaymentMethod = typeof VALID_METHODS[number]
@@ -56,6 +57,9 @@ export async function POST(
     .select('id, order_number, queue_number, status, total, paid_at')
     .eq('id', id)
     .single()
+
+  // Kirim invoice WA (non-blocking, tidak gagalkan response)
+  sendInvoiceWa(id).catch(() => {})
 
   return NextResponse.json({ data: order })
 }

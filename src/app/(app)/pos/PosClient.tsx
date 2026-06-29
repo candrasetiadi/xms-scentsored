@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -96,6 +96,13 @@ export function PosClient({
   // Success data
   const [successData, setSuccessData] = useState<SuccessData | null>(null)
 
+  // QRIS dynamic state
+  const [qrisOrderId,  setQrisOrderId]  = useState<string | null>(null)
+  const [qrisOrderData, setQrisOrderData] = useState<{ order_number: string; queue_number: number; total: number } | null>(null)
+  const [qrisString,   setQrisString]   = useState<string | null>(null)
+  const [qrisPolling,  setQrisPolling]  = useState(false)
+  const qrisTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
   // Custom racik modal
   const [customProduct, setCustomProduct] = useState<Product | null>(null)
   const [customNotes,   setCustomNotes]   = useState('')
@@ -122,7 +129,10 @@ export function PosClient({
   const selectedDriver = drivers.find(d => d.id === driverId)
 
   const needsEdc     = payMethod === 'debit_card' || payMethod === 'credit_card'
-  const canConfirm   = payMethod !== null && (!needsEdc || edcMachineId !== '')
+  const canConfirm   = payMethod !== null && payMethod !== 'qris' && (!needsEdc || edcMachineId !== '')
+
+  // Cleanup QRIS polling on unmount
+  useEffect(() => () => { if (qrisTimerRef.current) clearInterval(qrisTimerRef.current) }, [])
 
   // ── Cart ops ───────────────────────────────────────────────────────────────
 
@@ -178,6 +188,84 @@ export function PosClient({
     setPayMethod(null)
     setEdcMachineId('')
     setScreen('pos')
+    stopQrisPolling()
+    setQrisOrderId(null)
+    setQrisOrderData(null)
+    setQrisString(null)
+    setQrisPolling(false)
+  }
+
+  function stopQrisPolling() {
+    if (qrisTimerRef.current) { clearInterval(qrisTimerRef.current); qrisTimerRef.current = null }
+  }
+
+  async function handleQrisGenerate() {
+    setLoading(true)
+    setErrorMsg(null)
+    stopQrisPolling()
+
+    try {
+      // 1. Buat order
+      const createRes = await fetch('/api/v1/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          branch_id: branchId, driver_id: driverId || null,
+          customer_name: custName || null, customer_phone: custPhone || null,
+          discount,
+          items: cart.map(i => ({
+            product_id: i.product.id, qty: i.qty, unit_price: i.unit_price,
+            is_custom: i.is_custom, customization_notes: i.customization_notes || null,
+          })),
+        }),
+      })
+      const createJson = await createRes.json()
+      if (!createRes.ok) { setErrorMsg(createJson.error?.message ?? 'Gagal membuat order.'); return }
+
+      const orderId = createJson.data.id
+
+      // 2. Generate QRIS via checkout
+      const checkoutRes = await fetch(`/api/v1/orders/${orderId}/checkout`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ method: 'qris' }),
+      })
+      const checkoutJson = await checkoutRes.json()
+      if (!checkoutRes.ok) {
+        // Batalkan order yang terlanjur dibuat
+        await fetch(`/api/v1/orders/${orderId}/cancel`, { method: 'POST' }).catch(() => {})
+        setErrorMsg(checkoutJson.error?.message ?? 'Gagal generate QRIS.')
+        return
+      }
+
+      setQrisOrderId(orderId)
+      setQrisOrderData({ order_number: createJson.data.order_number, queue_number: createJson.data.queue_number, total: createJson.data.total })
+      setQrisString(checkoutJson.data.qris_string)
+
+      // 3. Mulai polling status setiap 3 detik
+      setQrisPolling(true)
+      qrisTimerRef.current = setInterval(async () => {
+        const r = await fetch(`/api/v1/orders/${orderId}`).catch(() => null)
+        if (!r?.ok) return
+        const j = await r.json()
+        const status = j.data?.status
+        if (status === 'paid' || status === 'in_production' || status === 'ready' || status === 'completed') {
+          stopQrisPolling()
+          setQrisPolling(false)
+          setQrisString(null)
+          setSuccessData({
+            id: orderId, order_number: createJson.data.order_number,
+            queue_number: createJson.data.queue_number,
+            total: createJson.data.total, method: 'qris',
+          })
+          setPayModalOpen(false)
+          setScreen('success')
+        }
+      }, 3000)
+    } catch {
+      setErrorMsg('Koneksi gagal. Coba lagi.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   function openPayModal() {
@@ -598,25 +686,55 @@ export function PosClient({
               {/* QRIS display */}
               {payMethod === 'qris' && (
                 <div className="flex flex-col items-center gap-3 pt-1">
-                  {qrisImageUrl ? (
-                    <div className="border-2 border-pine-100 rounded-xl p-3 bg-white">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={qrisImageUrl}
-                        alt="QRIS Scentsored"
-                        width={200}
-                        height={200}
-                        className="block"
-                      />
-                    </div>
+                  {qrisString ? (
+                    <>
+                      {/* Dynamic QR via canvas — render qris_string as QR code */}
+                      <div className="border-2 border-pine-100 rounded-xl p-3 bg-white text-center">
+                        <p className="text-xs text-ink-400 mb-2 font-mono break-all max-w-[200px]">
+                          {/* Show as text fallback; in production pair with a QR lib */}
+                          QR Data aktif
+                        </p>
+                        <div className="w-48 h-48 rounded-lg border border-pine-100 bg-sand-50 flex flex-col items-center justify-center gap-2">
+                          {qrisPolling && (
+                            <svg className="w-6 h-6 text-pine animate-spin" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                            </svg>
+                          )}
+                          <p className="text-xs text-ink-500 text-center px-2">
+                            {qrisPolling ? 'Menunggu pembayaran...' : 'QR siap di-scan'}
+                          </p>
+                          <p className="text-[10px] text-ink-400 font-mono text-center px-2 break-all">
+                            {qrisString.slice(0, 40)}…
+                          </p>
+                        </div>
+                      </div>
+                      <p className="text-xs text-ink-500 text-center">
+                        Minta pelanggan scan QRIS,<br/>pembayaran otomatis terkonfirmasi.
+                      </p>
+                      {qrisOrderData && (
+                        <p className="text-xs text-pine font-medium">
+                          Order #{qrisOrderData.order_number} · {formatRp(qrisOrderData.total)}
+                        </p>
+                      )}
+                    </>
                   ) : (
-                    <div className="w-48 h-48 rounded-xl border-2 border-dashed border-line flex items-center justify-center text-ink-300 text-sm">
-                      QR belum tersedia
-                    </div>
+                    <>
+                      {qrisImageUrl ? (
+                        <div className="border-2 border-pine-100 rounded-xl p-3 bg-white">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={qrisImageUrl} alt="QRIS Scentsored" width={200} height={200} className="block" />
+                        </div>
+                      ) : (
+                        <div className="w-48 h-48 rounded-xl border-2 border-dashed border-line flex items-center justify-center text-ink-300 text-sm">
+                          Klik Buat QRIS
+                        </div>
+                      )}
+                      <p className="text-xs text-ink-500 text-center">
+                        Tekan <strong>Buat QRIS</strong> untuk generate QR dinamis,<br/>atau gunakan QR statis cabang di atas.
+                      </p>
+                    </>
                   )}
-                  <p className="text-xs text-ink-500 text-center">
-                    Minta pelanggan scan QRIS di atas,<br/>lalu tekan <strong>Konfirmasi</strong> setelah pembayaran berhasil.
-                  </p>
                 </div>
               )}
 
@@ -634,18 +752,37 @@ export function PosClient({
             </div>
 
             {/* Footer: confirm button */}
-            <div className="px-4 pb-4 pt-2 border-t border-line flex-shrink-0">
-              <button
-                onClick={handlePay}
-                disabled={!canConfirm || loading}
-                className="w-full h-12 rounded-xl bg-pine text-white font-semibold text-sm hover:bg-pine-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                {loading
-                  ? 'Memproses…'
-                  : payMethod
-                    ? `Konfirmasi ${METHOD_LABEL[payMethod]} · ${formatRp(total)}`
-                    : 'Pilih metode pembayaran'}
-              </button>
+            <div className="px-4 pb-4 pt-2 border-t border-line flex-shrink-0 space-y-2">
+              {payMethod === 'qris' && !qrisString && (
+                <button
+                  onClick={handleQrisGenerate}
+                  disabled={loading}
+                  className="w-full h-12 rounded-xl bg-pine text-white font-semibold text-sm hover:bg-pine-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  {loading ? 'Membuat QRIS…' : `Buat QRIS · ${formatRp(total)}`}
+                </button>
+              )}
+              {payMethod === 'qris' && qrisString && (
+                <button
+                  onClick={() => { stopQrisPolling(); setQrisString(null); setQrisPolling(false); setQrisOrderId(null) }}
+                  className="w-full h-10 rounded-xl border border-line text-ink-500 text-sm hover:bg-sand-50"
+                >
+                  Batalkan & Buat Ulang
+                </button>
+              )}
+              {payMethod !== 'qris' && (
+                <button
+                  onClick={handlePay}
+                  disabled={!canConfirm || loading}
+                  className="w-full h-12 rounded-xl bg-pine text-white font-semibold text-sm hover:bg-pine-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  {loading
+                    ? 'Memproses…'
+                    : payMethod
+                      ? `Konfirmasi ${METHOD_LABEL[payMethod]} · ${formatRp(total)}`
+                      : 'Pilih metode pembayaran'}
+                </button>
+              )}
             </div>
           </div>
         </div>

@@ -33,7 +33,7 @@ export async function GET(
     .order('accrued_at', { ascending: false })
     .range(offset, offset + limit - 1)
 
-  if (status) query = query.eq('status', status)
+  if (status) query = query.eq('status', status as 'accrued' | 'paid')
   if (from)   query = query.gte('accrued_at', from)
   if (to)     query = query.lte('accrued_at', to)
 

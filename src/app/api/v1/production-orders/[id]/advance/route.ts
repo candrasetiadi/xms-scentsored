@@ -4,10 +4,10 @@ import { NextResponse } from 'next/server'
 import type { AdvanceProductionResult } from '@/types/database'
 
 type AdvanceBody = {
-  status: 'diracik' | 'qc' | 'selesai' | 'diambil'
+  status: 'diracik' | 'packing' | 'selesai' | 'diambil'
 }
 
-const VALID_STATUSES = new Set<string>(['diracik', 'qc', 'selesai', 'diambil'])
+const VALID_STATUSES = new Set<string>(['diracik', 'packing', 'selesai', 'diambil'])
 
 // POST /api/v1/production-orders/[id]/advance
 export async function POST(
@@ -51,7 +51,7 @@ export async function POST(
 
   if (!body.status || !VALID_STATUSES.has(body.status)) {
     return NextResponse.json(
-      { error: { code: 'VALIDATION', message: 'status harus salah satu dari: diracik, qc, selesai, diambil.' } },
+      { error: { code: 'VALIDATION', message: 'status harus salah satu dari: diracik, packing, selesai, diambil.' } },
       { status: 400 },
     )
   }

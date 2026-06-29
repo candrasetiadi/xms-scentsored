@@ -84,7 +84,7 @@ export async function GET(request: Request) {
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1)
 
-  if (status) query = query.eq('status', status)
+  if (status) query = query.eq('status', status as 'draft' | 'awaiting_payment' | 'paid' | 'in_production' | 'ready' | 'completed' | 'cancelled')
   if (date)   query = query.gte('created_at', `${date}T00:00:00`).lt('created_at', `${date}T23:59:59.999`)
 
   const { data, error, count } = await query

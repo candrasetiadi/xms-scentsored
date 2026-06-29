@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type TvStatus = 'antri' | 'diracik' | 'qc' | 'selesai'
+type TvStatus = 'antri' | 'diracik' | 'packing' | 'selesai'
 
 interface TvOrder {
   id: string
@@ -42,7 +42,7 @@ interface BadgeProps {
 
 function QueueBadge({ queueNumber, status }: BadgeProps) {
   const isWaiting    = status === 'antri'
-  const isProcessing = status === 'diracik' || status === 'qc'
+  const isProcessing = status === 'diracik' || status === 'packing'
   const isDone       = status === 'selesai'
 
   const outerRingCls = isWaiting
@@ -139,7 +139,7 @@ export function TvClient({ branchId }: Props) {
       .from('production_orders')
       .select('id, status, branch_id, orders(queue_number), products(name)')
       .eq('branch_id', branchId)
-      .in('status', ['antri', 'diracik', 'qc', 'selesai'])
+      .in('status', ['antri', 'diracik', 'packing', 'selesai'])
       .order('created_at', { ascending: true })
 
     if (!error && data) {
@@ -206,7 +206,7 @@ export function TvClient({ branchId }: Props) {
   // ── Grouped orders ────────────────────────────────────────────────────────────
 
   const waiting    = orders.filter(o => o.status === 'antri')
-  const processing = orders.filter(o => o.status === 'diracik' || o.status === 'qc')
+  const processing = orders.filter(o => o.status === 'diracik' || o.status === 'packing')
   const done       = orders.filter(o => o.status === 'selesai')
 
   // ── No branch_id guard ────────────────────────────────────────────────────────

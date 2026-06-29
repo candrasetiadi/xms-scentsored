@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export type ProductionStatus = 'antri' | 'diracik' | 'qc' | 'selesai' | 'diambil'
+export type ProductionStatus = 'antri' | 'diracik' | 'packing' | 'selesai' | 'diambil'
 
 export interface ProductionOrder {
   id: string
@@ -53,15 +53,15 @@ const COLUMNS: ColumnConfig[] = [
     status: 'diracik',
     label: 'Diracik',
     headerCls: 'bg-rust-50 text-rust border-b border-rust-100',
-    advanceLabel: 'Selesai Racik, Ke QC →',
+    advanceLabel: 'Selesai Racik, Ke Packing →',
     advanceCls: 'bg-warning text-ink-900 hover:opacity-90',
-    nextStatus: 'qc',
+    nextStatus: 'packing',
   },
   {
-    status: 'qc',
-    label: 'QC',
+    status: 'packing',
+    label: 'Packing',
     headerCls: 'bg-warning-bg text-warning border-b border-warning-bd',
-    advanceLabel: 'Selesai & Konfirmasi ✓',
+    advanceLabel: 'Selesai Packing ✓',
     advanceCls: 'bg-pine text-white hover:bg-pine-700',
     nextStatus: 'selesai',
   },
@@ -105,9 +105,10 @@ interface CardProps {
   onAdvance: (id: string, nextStatus: ProductionStatus) => Promise<void>
   advancing: string | null
   error: string | null
+  warning: string | null
 }
 
-function ProductionCard({ order, column, onAdvance, advancing, error }: CardProps) {
+function ProductionCard({ order, column, onAdvance, advancing, error, warning }: CardProps) {
   const isAdvancing = advancing === order.id
 
   return (
@@ -146,6 +147,13 @@ function ProductionCard({ order, column, onAdvance, advancing, error }: CardProp
             {error}
           </p>
         )}
+
+        {/* Warning stok kurang (tidak memblokir) */}
+        {warning && !error && (
+          <p className="text-[10px] text-warning bg-warning-bg border border-warning-bd rounded px-2 py-1">
+            ⚠ {warning}
+          </p>
+        )}
       </div>
 
       {/* Advance button */}
@@ -179,6 +187,7 @@ export function KanbanClient({ staffId: _staffId, staffRole, initialBranchId, br
   const [fetchErr, setFetchErr]   = useState<string | null>(null)
   const [advancing, setAdvancing] = useState<string | null>(null)
   const [advErr,   setAdvErr]     = useState<Record<string, string>>({})
+  const [advWarn,  setAdvWarn]    = useState<Record<string, string>>({})
 
   // ── Fetch orders ────────────────────────────────────────────────────────────
 
@@ -235,7 +244,8 @@ export function KanbanClient({ staffId: _staffId, staffRole, initialBranchId, br
 
   async function handleAdvance(id: string, nextStatus: ProductionStatus) {
     setAdvancing(id)
-    setAdvErr(prev => { const n = { ...prev }; delete n[id]; return n })
+    setAdvErr(prev =>  { const n = { ...prev }; delete n[id]; return n })
+    setAdvWarn(prev => { const n = { ...prev }; delete n[id]; return n })
 
     try {
       const res  = await fetch(`/api/v1/production-orders/${id}/advance`, {
@@ -248,7 +258,11 @@ export function KanbanClient({ staffId: _staffId, staffRole, initialBranchId, br
         setAdvErr(prev => ({ ...prev, [id]: json.error?.message ?? 'Gagal memperbarui status.' }))
         return
       }
-      // Optimistic update — realtime will also fire but update locally immediately
+      // Tampilkan warning stok kurang (tidak memblokir)
+      const warnings: { raw_material_id: string; unfulfilled_qty: number }[] = json.data?.warnings ?? []
+      if (warnings.length > 0) {
+        setAdvWarn(prev => ({ ...prev, [id]: `Stok bahan baku kurang untuk ${warnings.length} bahan. Harap cek inventory.` }))
+      }
       setOrders(prev =>
         prev.map(o => o.id === id ? { ...o, status: nextStatus, completed_at: json.data?.completed_at ?? o.completed_at } : o)
       )
@@ -341,6 +355,7 @@ export function KanbanClient({ staffId: _staffId, staffRole, initialBranchId, br
                         onAdvance={handleAdvance}
                         advancing={advancing}
                         error={advErr[order.id] ?? null}
+                        warning={advWarn[order.id] ?? null}
                       />
                     ))
                   )}

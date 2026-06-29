@@ -2,8 +2,9 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 
-// POST /api/v1/driver-payouts — buat payout periode, tandai fee accrued → paid
-// Role: owner
+const MANAGER_ROLES = ['owner', 'admin']
+
+// POST /api/v1/driver-payouts — buat payout periode (atomic via DB function)
 export async function POST(request: Request) {
   const supabase = await createClient()
   const { data: { user }, error: authErr } = await supabase.auth.getUser()
@@ -11,63 +12,32 @@ export async function POST(request: Request) {
 
   const { data: staff } = await supabase
     .from('staff').select('role').eq('auth_user_id', user.id).eq('active', true).single()
-  if (!staff || staff.role !== 'owner') {
-    return NextResponse.json({ error: { code: 'FORBIDDEN', message: 'Hanya owner.' } }, { status: 403 })
+  if (!staff || !MANAGER_ROLES.includes(staff.role))
+    return NextResponse.json({ error: { code: 'FORBIDDEN', message: 'Hanya owner/admin.' } }, { status: 403 })
+
+  let body: { driver_id: string; period_start: string; period_end: string }
+  try { body = await request.json() } catch {
+    return NextResponse.json({ error: { code: 'VALIDATION', message: 'Body tidak valid.' } }, { status: 400 })
   }
 
-  const body = await request.json() as {
-    driver_id: string
-    period_start: string  // YYYY-MM-DD
-    period_end:   string
-  }
-
-  if (!body.driver_id || !body.period_start || !body.period_end) {
+  if (!body.driver_id || !body.period_start || !body.period_end)
     return NextResponse.json({ error: { code: 'VALIDATION', message: 'driver_id, period_start, period_end wajib.' } }, { status: 400 })
-  }
 
   const admin = createAdminClient()
+  const { data, error } = await admin.rpc('create_driver_payout', {
+    p_driver_id:    body.driver_id,
+    p_period_start: body.period_start,
+    p_period_end:   body.period_end,
+  })
 
-  // Hitung total fee accrued dalam periode
-  const { data: fees, error: feesErr } = await admin
-    .from('driver_fees')
-    .select('id, fee_amount')
-    .eq('driver_id', body.driver_id)
-    .eq('status', 'accrued')
-    .gte('accrued_at', `${body.period_start}T00:00:00Z`)
-    .lte('accrued_at', `${body.period_end}T23:59:59Z`)
-
-  if (feesErr) return NextResponse.json({ error: { code: 'DB_ERROR', message: feesErr.message } }, { status: 500 })
-  if (!fees?.length) {
-    return NextResponse.json({ error: { code: 'VALIDATION', message: 'Tidak ada fee accrued dalam periode ini.' } }, { status: 400 })
+  if (error) {
+    const msg = error.message ?? ''
+    if (msg.includes('Tidak ada fee'))
+      return NextResponse.json({ error: { code: 'VALIDATION', message: msg } }, { status: 400 })
+    return NextResponse.json({ error: { code: 'DB_ERROR', message: msg } }, { status: 500 })
   }
 
-  const total = fees.reduce((s, f) => s + f.fee_amount, 0)
-  const feeIds = fees.map(f => f.id)
-
-  // Buat payout
-  const { data: payout, error: payoutErr } = await admin
-    .from('driver_payouts')
-    .insert({
-      driver_id:    body.driver_id,
-      period_start: body.period_start,
-      period_end:   body.period_end,
-      total,
-      status:       'pending',
-    })
-    .select()
-    .single()
-
-  if (payoutErr) return NextResponse.json({ error: { code: 'DB_ERROR', message: payoutErr.message } }, { status: 500 })
-
-  // Tandai fee → paid + link ke payout
-  const { error: updateErr } = await admin
-    .from('driver_fees')
-    .update({ status: 'paid', payout_id: payout.id })
-    .in('id', feeIds)
-
-  if (updateErr) return NextResponse.json({ error: { code: 'DB_ERROR', message: updateErr.message } }, { status: 500 })
-
-  return NextResponse.json({ data: { ...payout, fee_count: feeIds.length } }, { status: 201 })
+  return NextResponse.json({ data }, { status: 201 })
 }
 
 // GET /api/v1/driver-payouts?driver_id=&status=
@@ -78,9 +48,8 @@ export async function GET(request: Request) {
 
   const { data: staff } = await supabase
     .from('staff').select('role').eq('auth_user_id', user.id).eq('active', true).single()
-  if (!staff || !['owner', 'admin'].includes(staff.role)) {
+  if (!staff || !MANAGER_ROLES.includes(staff.role))
     return NextResponse.json({ error: { code: 'FORBIDDEN' } }, { status: 403 })
-  }
 
   const { searchParams } = new URL(request.url)
   const driverId = searchParams.get('driver_id')
@@ -92,7 +61,7 @@ export async function GET(request: Request) {
     .order('created_at', { ascending: false })
 
   if (driverId) query = query.eq('driver_id', driverId)
-  if (status)   query = query.eq('status', status)
+  if (status)   query = query.eq('status', status as 'pending' | 'paid')
 
   const { data, error, count } = await query
   if (error) return NextResponse.json({ error: { code: 'DB_ERROR', message: error.message } }, { status: 500 })

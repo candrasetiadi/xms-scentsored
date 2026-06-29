@@ -30,7 +30,7 @@ export async function GET(request: Request) {
 
   if (refType) query = query.eq('reference_type', refType)
   if (refId)   query = query.eq('reference_id', refId)
-  if (status)  query = query.eq('status', status)
+  if (status)  query = query.eq('status', status as 'queued' | 'sent' | 'failed')
 
   const { data, error, count } = await query
   if (error) return NextResponse.json({ error: { code: 'DB_ERROR', message: error.message } }, { status: 500 })

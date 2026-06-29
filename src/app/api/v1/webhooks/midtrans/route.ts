@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import crypto from 'crypto'
+import { sendInvoiceWa } from '@/lib/messaging'
 
 // POST /api/v1/webhooks/midtrans  — publik, dikecualikan dari middleware auth
 // Menerima notifikasi payment dari Midtrans dan memproses settlement secara idempotent.
@@ -76,6 +77,12 @@ export async function POST(request: Request) {
   if (error) {
     console.error('[Midtrans webhook] process_midtrans_settlement error:', error)
     return NextResponse.json({ error: 'Processing failed' }, { status: 500 })
+  }
+
+  // Kirim invoice WA setelah settlement (non-blocking)
+  if (result) {
+    const orderId = result as string
+    sendInvoiceWa(orderId).catch(() => {})
   }
 
   return NextResponse.json({ received: true, result })

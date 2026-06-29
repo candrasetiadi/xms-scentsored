@@ -84,7 +84,7 @@ export type Database = {
       orders: {
         Row: { id: string; branch_id: string; order_number: string; queue_number: number; customer_id: string | null; staff_id: string | null; driver_id: string | null; status: 'draft' | 'awaiting_payment' | 'paid' | 'in_production' | 'ready' | 'completed' | 'cancelled'; subtotal: number; discount: number; total: number; paid_at: string | null; created_at: string }
         Insert: { id?: string; branch_id: string; order_number: string; queue_number: number; customer_id?: string | null; staff_id?: string | null; driver_id?: string | null; status?: 'draft' | 'awaiting_payment' | 'paid' | 'in_production' | 'ready' | 'completed' | 'cancelled'; subtotal?: number; discount?: number; total?: number; paid_at?: string | null; created_at?: string }
-        Update: never
+        Update: { status?: 'draft' | 'awaiting_payment' | 'paid' | 'in_production' | 'ready' | 'completed' | 'cancelled'; paid_at?: string | null }
         Relationships: []
       }
       order_items: {
@@ -96,7 +96,7 @@ export type Database = {
       driver_fees: {
         Row: { id: string; driver_id: string; order_id: string; base_amount: number; fee_amount: number; fee_scheme_snapshot: Record<string, unknown> | null; status: 'accrued' | 'paid'; payout_id: string | null; accrued_at: string }
         Insert: { id?: string; driver_id: string; order_id: string; base_amount: number; fee_amount: number; fee_scheme_snapshot?: Record<string, unknown> | null; status?: 'accrued' | 'paid'; payout_id?: string | null; accrued_at?: string }
-        Update: never
+        Update: { status?: 'accrued' | 'paid'; payout_id?: string | null }
         Relationships: []
       }
       driver_payouts: {
@@ -108,7 +108,7 @@ export type Database = {
       outbound_messages: {
         Row: { id: string; channel: string; to_phone: string; purpose: 'invoice' | 'booking_confirm' | 'order_ready'; reference_type: string | null; reference_id: string | null; payload: Record<string, unknown> | null; provider: string | null; provider_ref: string | null; status: 'queued' | 'sent' | 'failed'; error: string | null; sent_at: string | null; created_at: string }
         Insert: { id?: string; channel?: string; to_phone: string; purpose: 'invoice' | 'booking_confirm' | 'order_ready'; reference_type?: string | null; reference_id?: string | null; payload?: Record<string, unknown> | null; provider?: string | null; provider_ref?: string | null; status?: 'queued' | 'sent' | 'failed'; error?: string | null; sent_at?: string | null; created_at?: string }
-        Update: { status?: 'queued' | 'sent' | 'failed'; provider_ref?: string | null; error?: string | null; sent_at?: string | null }
+        Update: { status?: 'queued' | 'sent' | 'failed'; provider?: string | null; provider_ref?: string | null; error?: string | null; sent_at?: string | null }
         Relationships: []
       }
       // ── M11 ────────────────────────────────────────────────────────────────
@@ -126,7 +126,7 @@ export type Database = {
           order_id: string
           order_item_id: string
           product_id: string
-          status: 'antri' | 'diracik' | 'qc' | 'selesai' | 'diambil'
+          status: 'antri' | 'diracik' | 'packing' | 'selesai' | 'diambil'
           notes: string | null
           assigned_to: string | null
           started_at: string | null
@@ -139,7 +139,7 @@ export type Database = {
           order_id: string
           order_item_id: string
           product_id: string
-          status?: 'antri' | 'diracik' | 'qc' | 'selesai' | 'diambil'
+          status?: 'antri' | 'diracik' | 'packing' | 'selesai' | 'diambil'
           notes?: string | null
           assigned_to?: string | null
           started_at?: string | null
@@ -154,6 +154,91 @@ export type Database = {
           { foreignKeyName: 'production_orders_product_id_fkey';  columns: ['product_id'];    referencedRelation: 'products';    referencedColumns: ['id'] },
           { foreignKeyName: 'production_orders_assigned_to_fkey'; columns: ['assigned_to'];   referencedRelation: 'staff';       referencedColumns: ['id'] },
         ]
+      }
+      // ── M3 Procurement ─────────────────────────────────────────────────────
+      purchase_orders: {
+        Row: {
+          id:          string
+          branch_id:   string
+          supplier_id: string
+          po_number:   string
+          status:      'draft' | 'ordered' | 'partial' | 'received' | 'cancelled'
+          notes:       string | null
+          total:       number
+          ordered_at:  string | null
+          received_at: string | null
+          created_by:  string | null
+          created_at:  string
+        }
+        Insert: {
+          id?:          string
+          branch_id:    string
+          supplier_id:  string
+          po_number:    string
+          status?:      'draft' | 'ordered' | 'partial' | 'received' | 'cancelled'
+          notes?:       string | null
+          total?:       number
+          ordered_at?:  string | null
+          received_at?: string | null
+          created_by?:  string | null
+          created_at?:  string
+        }
+        Update: {
+          status?:      'draft' | 'ordered' | 'partial' | 'received' | 'cancelled'
+          notes?:       string | null
+          total?:       number
+          ordered_at?:  string | null
+          received_at?: string | null
+        }
+        Relationships: [
+          { foreignKeyName: 'purchase_orders_branch_id_fkey';   columns: ['branch_id'];   referencedRelation: 'branches';   referencedColumns: ['id'] },
+          { foreignKeyName: 'purchase_orders_supplier_id_fkey'; columns: ['supplier_id']; referencedRelation: 'suppliers';  referencedColumns: ['id'] },
+          { foreignKeyName: 'purchase_orders_created_by_fkey';  columns: ['created_by'];  referencedRelation: 'staff';      referencedColumns: ['id'] },
+        ]
+      }
+      purchase_order_items: {
+        Row: {
+          id:              string
+          po_id:           string
+          raw_material_id: string
+          qty_ordered:     number
+          qty_received:    number
+          unit_cost:       number
+          notes:           string | null
+          created_at:      string
+        }
+        Insert: {
+          id?:              string
+          po_id:            string
+          raw_material_id:  string
+          qty_ordered:      number
+          qty_received?:    number
+          unit_cost:        number
+          notes?:           string | null
+          created_at?:      string
+        }
+        Update: {
+          qty_received?: number
+          unit_cost?:    number
+          notes?:        string | null
+        }
+        Relationships: [
+          { foreignKeyName: 'purchase_order_items_po_id_fkey';           columns: ['po_id'];           referencedRelation: 'purchase_orders'; referencedColumns: ['id'] },
+          { foreignKeyName: 'purchase_order_items_raw_material_id_fkey'; columns: ['raw_material_id']; referencedRelation: 'raw_materials';   referencedColumns: ['id'] },
+        ]
+      }
+      // ── M8 Booking ─────────────────────────────────────────────────────────
+      consultation_slots: {
+        Row: { id: string; branch_id: string; date: string; start_time: string; end_time: string; max_bookings: number; notes: string | null; is_active: boolean; created_at: string }
+        Insert: { id?: string; branch_id: string; date: string; start_time: string; end_time: string; max_bookings?: number; notes?: string | null; is_active?: boolean; created_at?: string }
+        Update: { date?: string; start_time?: string; end_time?: string; max_bookings?: number; notes?: string | null; is_active?: boolean }
+        Relationships: []
+      }
+      consultation_bookings: {
+        Row: { id: string; slot_id: string; customer_name: string; customer_phone: string; customer_email: string | null; status: 'confirmed' | 'cancelled'; notes: string | null; queue_number: number; created_at: string }
+        Insert: { id?: string; slot_id: string; customer_name: string; customer_phone: string; customer_email?: string | null; status?: 'confirmed' | 'cancelled'; notes?: string | null; queue_number: number; created_at?: string }
+        Update: { status?: 'confirmed' | 'cancelled'; notes?: string | null }
+        Relationships: []
       }
       // ── M9 Notifications ───────────────────────────────────────────────────
       notifications: {
@@ -235,7 +320,17 @@ export type Database = {
       enqueue_wa_invoice:            { Args: { p_order_id: string }; Returns: void }
       // M6 Production
       create_production_orders:      { Args: { p_order_id: string }; Returns: void }
-      advance_production_status:     { Args: { p_production_order_id: string; p_new_status: 'antri' | 'diracik' | 'qc' | 'selesai' | 'diambil'; p_staff_id: string }; Returns: AdvanceProductionResult }
+      advance_production_status:     { Args: { p_production_order_id: string; p_new_status: 'antri' | 'diracik' | 'packing' | 'selesai' | 'diambil'; p_staff_id: string }; Returns: AdvanceProductionResult }
+      // M3 Procurement
+      receive_po_items:              { Args: { p_po_id: string; p_staff_id: string; p_items: Record<string, unknown>[] }; Returns: ReceivePoResult }
+      // M7 Driver payout
+      create_driver_payout:          { Args: { p_driver_id: string; p_period_start: string; p_period_end: string }; Returns: CreatePayoutResult }
+      // M12 Reporting
+      get_sales_report:              { Args: { p_branch_id: string; p_from: string; p_to: string }; Returns: SalesReport }
+      get_driver_fee_report:         { Args: { p_from: string; p_to: string }; Returns: DriverFeeReportRow[] }
+      get_production_report:         { Args: { p_branch_id: string; p_from: string; p_to: string }; Returns: ProductionReport }
+      // M8 Booking
+      check_and_create_booking:      { Args: { p_slot_id: string; p_customer_name: string; p_customer_phone: string; p_customer_email?: string | null; p_notes?: string | null }; Returns: CheckBookingResult }
     }
     Enums: Record<string, never>
   }
@@ -267,9 +362,22 @@ export interface RawStockRow {
 // Return type untuk advance_production_status
 export interface AdvanceProductionResult {
   id:           string
-  status:       'antri' | 'diracik' | 'qc' | 'selesai' | 'diambil'
+  status:       'antri' | 'diracik' | 'packing' | 'selesai' | 'diambil'
   assigned_to:  string
   completed_at: string | null
+}
+
+export interface CreatePayoutResult {
+  payout_id:  string
+  total:      number
+  fee_count:  number
+  status:     'pending'
+}
+
+export interface ReceivePoResult {
+  po_id:          string
+  items_received: number
+  po_status:      'draft' | 'ordered' | 'partial' | 'received' | 'cancelled'
 }
 
 export interface AppNotification {
@@ -284,6 +392,76 @@ export interface AppNotification {
   created_at:     string
   is_read:        boolean
   read_at:        string | null
+}
+
+// ── M12 Reporting ─────────────────────────────────────────────────────────────
+
+export interface SalesReportDaily {
+  day:             string
+  order_count:     number
+  revenue:         number
+  total_discount:  number
+  avg_order_value: number
+}
+
+export interface SalesReportProduct {
+  product_name: string
+  category:     string | null
+  revenue:      number
+  units_sold:   number
+}
+
+export interface SalesReportTotals {
+  total_revenue:    number
+  total_orders:     number
+  total_discount:   number
+  avg_order_value:  number
+}
+
+export interface SalesReport {
+  daily:        SalesReportDaily[]
+  top_products: SalesReportProduct[]
+  totals:       SalesReportTotals
+}
+
+export interface StockValuationRow {
+  raw_material_id: string
+  name:            string
+  unit:            string
+  total_qty:       number
+  total_value:     number
+}
+
+export interface ProductionStatusCount {
+  status: string
+  cnt:    number
+}
+
+export interface ProductionReport {
+  by_status:               ProductionStatusCount[]
+  avg_lead_time_minutes:   number
+}
+
+export interface CheckBookingResult {
+  booking_id:   string
+  queue_number: number
+  slot_date:    string
+  start_time:   string
+  end_time:     string
+  max_bookings: number
+  filled:       number
+}
+
+export interface DriverFeeReportRow {
+  driver_id:     string
+  driver_name:   string
+  driver_type:   string
+  fee_value:     number
+  order_count:   number
+  total_base:    number
+  total_fee:     number
+  total_accrued: number
+  total_paid:    number
 }
 
 // Convenience row types

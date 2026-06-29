@@ -40,7 +40,7 @@ export default async function OrderHistoryPage({
     .order('created_at', { ascending: false })
     .limit(100)
 
-  if (statusFilter) query = (query as typeof query).eq('status', statusFilter)
+  if (statusFilter) query = (query as typeof query).eq('status', statusFilter as 'draft' | 'awaiting_payment' | 'paid' | 'in_production' | 'ready' | 'completed' | 'cancelled')
 
   const { data: orders } = await query
 

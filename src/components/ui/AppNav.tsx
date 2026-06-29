@@ -15,6 +15,10 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Riwayat',     href: '/pos/history',      roles: ['owner', 'admin', 'cashier'] },
   { label: 'Inventory',   href: '/inventory',        roles: ['owner', 'admin', 'stock_keeper'] },
   { label: 'Produksi',    href: '/production',       roles: ['owner', 'admin', 'perfumer'] },
+  { label: 'Procurement', href: '/procurement',      roles: ['owner', 'admin', 'stock_keeper'] },
+  { label: 'Driver',      href: '/drivers',          roles: ['owner', 'admin'] },
+  { label: 'Laporan',     href: '/reporting',        roles: ['owner', 'admin'] },
+  { label: 'Booking',     href: '/admin/slots',      roles: ['owner', 'admin'] },
   { label: 'Master Data', href: '/admin/products',   roles: ['owner', 'admin'] },
 ]
 
