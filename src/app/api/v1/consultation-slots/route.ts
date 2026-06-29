@@ -15,9 +15,9 @@ export async function GET(request: Request) {
   let query = supabase
     .from('consultation_slots')
     .select(`
-      id, branch_id, date, start_time, end_time, max_bookings, notes, is_active,
+      id, branch_id, date, start_time, end_time, max_bookings, price, notes, is_active,
       branches!inner(id, name),
-      consultation_bookings(id, status)
+      consultation_bookings(id, status, qty)
     `)
     .eq('is_active', true)
     .gte('date', from)
@@ -31,8 +31,10 @@ export async function GET(request: Request) {
   if (error) return NextResponse.json({ error: { code: 'DB_ERROR', message: error.message } }, { status: 500 })
 
   const result = (data ?? []).map(slot => {
-    const bookings = ((slot.consultation_bookings ?? []) as unknown) as { status: string }[]
-    const filled   = bookings.filter(b => b.status === 'confirmed').length
+    const bookings = ((slot.consultation_bookings ?? []) as unknown) as { status: string; qty: number }[]
+    const filled   = bookings
+      .filter(b => b.status === 'confirmed' || b.status === 'pending_payment')
+      .reduce((sum, b) => sum + (b.qty ?? 1), 0)
     return {
       id:           slot.id,
       branch_id:    slot.branch_id,
@@ -41,8 +43,9 @@ export async function GET(request: Request) {
       start_time:   slot.start_time,
       end_time:     slot.end_time,
       max_bookings: slot.max_bookings,
+      price:        slot.price,
       filled,
-      available:    slot.max_bookings - filled,
+      available:    Math.max(0, slot.max_bookings - filled),
       notes:        slot.notes,
     }
   })
@@ -63,7 +66,7 @@ export async function POST(request: Request) {
 
   let body: {
     branch_id?: string; date: string; start_time: string; end_time: string
-    max_bookings?: number; notes?: string
+    max_bookings?: number; price?: number; notes?: string
   }
   try { body = await request.json() } catch {
     return NextResponse.json({ error: { code: 'VALIDATION', message: 'Body tidak valid.' } }, { status: 400 })
@@ -86,9 +89,10 @@ export async function POST(request: Request) {
       start_time:   body.start_time,
       end_time:     body.end_time,
       max_bookings: body.max_bookings ?? 16,
+      price:        body.price ?? 0,
       notes:        body.notes ?? null,
     })
-    .select('id, date, start_time, end_time, max_bookings')
+    .select('id, date, start_time, end_time, max_bookings, price')
     .single()
 
   if (error) return NextResponse.json({ error: { code: 'DB_ERROR', message: error.message } }, { status: 500 })

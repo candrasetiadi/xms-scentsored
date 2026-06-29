@@ -2,9 +2,11 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { sendInvoiceWa } from '@/lib/messaging'
+import { isGoogleCalendarConfigured } from '@/lib/google-calendar'
+import { syncCalendar } from '../../bookings/route'
 
 // POST /api/v1/webhooks/midtrans  — publik, dikecualikan dari middleware auth
-// Menerima notifikasi payment dari Midtrans dan memproses settlement secara idempotent.
+// Menangani settlement untuk POS order DAN booking konsultasi secara idempotent.
 
 function verifyMidtransSignature(
   orderId: string,
@@ -23,7 +25,6 @@ function verifyMidtransSignature(
 export async function POST(request: Request) {
   const serverKey = process.env.MIDTRANS_SERVER_KEY
   if (!serverKey) {
-    // Jika belum dikonfigurasi, balas 200 agar Midtrans tidak retry terus
     return NextResponse.json({ received: true, note: 'Midtrans not configured' })
   }
 
@@ -35,28 +36,83 @@ export async function POST(request: Request) {
   }
 
   const {
-    order_id: externalId,
-    status_code: statusCode,
-    gross_amount: grossAmount,
+    order_id:           externalId,
+    status_code:        statusCode,
+    gross_amount:       grossAmount,
     transaction_status: transactionStatus,
-    signature_key: signatureKey,
-    transaction_id: transactionId,
-    fraud_status: fraudStatus,
+    signature_key:      signatureKey,
+    transaction_id:     transactionId,
+    fraud_status:       fraudStatus,
   } = body
 
-  // Verifikasi signature Midtrans
   if (!verifyMidtransSignature(externalId, statusCode, grossAmount, serverKey, signatureKey)) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
   }
 
-  // Hanya proses settlement yang bersih
+  const admin     = createAdminClient()
   const isSettled = transactionStatus === 'settlement' ||
     (transactionStatus === 'capture' && fraudStatus === 'accept')
+  const isExpired = ['expire', 'cancel', 'deny', 'failure'].includes(transactionStatus)
 
+  // ── Cek apakah ini payment untuk booking konsultasi ───────────────────────
+  // external_id untuk booking = booking UUID (dari check_and_create_booking)
+  const { data: booking } = await admin
+    .from('consultation_bookings')
+    .select('id, slot_id, status, amount')
+    .eq('payment_external_id', externalId)
+    .maybeSingle()
+
+  if (booking) {
+    // Idempotent: skip jika sudah diproses
+    if (booking.status !== 'pending_payment') {
+      return NextResponse.json({ received: true, note: 'already processed' })
+    }
+
+    if (isSettled) {
+      const paidAt = new Date().toISOString()
+      await admin
+        .from('consultation_bookings')
+        .update({ status: 'confirmed', paid_at: paidAt })
+        .eq('id', booking.id)
+
+      if (isGoogleCalendarConfigured()) {
+        const { data: slot } = await admin
+          .from('consultation_slots')
+          .select('max_bookings')
+          .eq('id', booking.slot_id)
+          .single()
+        syncCalendar({ slotId: booking.slot_id, maxBookings: slot?.max_bookings ?? 16 })
+          .catch(err => console.error('[Calendar] webhook sync error:', err))
+      }
+
+      console.log(`[Midtrans] Booking ${booking.id} confirmed via webhook`)
+    }
+
+    if (isExpired) {
+      await admin
+        .from('consultation_bookings')
+        .update({ status: 'expired' })
+        .eq('id', booking.id)
+
+      if (isGoogleCalendarConfigured()) {
+        const { data: slot } = await admin
+          .from('consultation_slots')
+          .select('max_bookings')
+          .eq('id', booking.slot_id)
+          .single()
+        syncCalendar({ slotId: booking.slot_id, maxBookings: slot?.max_bookings ?? 16 })
+          .catch(err => console.error('[Calendar] webhook sync error (expire):', err))
+      }
+
+      console.log(`[Midtrans] Booking ${booking.id} expired via webhook`)
+    }
+
+    return NextResponse.json({ received: true })
+  }
+
+  // ── POS order payment ──────────────────────────────────────────────────────
   if (!isSettled) {
-    // Untuk expired/failed, update status payment saja
-    if (['expire', 'cancel', 'deny', 'failure'].includes(transactionStatus)) {
-      const admin = createAdminClient()
+    if (isExpired) {
       await admin
         .from('payments')
         .update({ status: transactionStatus === 'expire' ? 'expired' : 'failed' })
@@ -66,12 +122,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ received: true })
   }
 
-  // Proses settlement via SECURITY DEFINER function (idempotent)
-  const admin = createAdminClient()
   const { data: result, error } = await admin.rpc('process_midtrans_settlement', {
-    p_external_id:  externalId,
-    p_amount:       parseFloat(grossAmount),
-    p_gateway_ref:  transactionId ?? '',
+    p_external_id: externalId,
+    p_amount:      parseFloat(grossAmount),
+    p_gateway_ref: transactionId ?? '',
   })
 
   if (error) {
@@ -79,7 +133,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Processing failed' }, { status: 500 })
   }
 
-  // Kirim invoice WA setelah settlement (non-blocking)
   if (result) {
     const orderId = result as string
     sendInvoiceWa(orderId).catch(() => {})

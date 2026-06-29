@@ -3,7 +3,10 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import { isGoogleCalendarConfigured, updateEventDescription } from '@/lib/google-calendar'
 
-// PATCH /api/v1/bookings/:id — update status (manager only)
+// PATCH /api/v1/bookings/:id
+// action: 'confirm' | 'cancel'
+// Confirm: admin manual confirm (pending_payment → confirmed)
+// Cancel: admin cancel booking (confirmed/pending_payment → cancelled)
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -18,40 +21,51 @@ export async function PATCH(
     return NextResponse.json({ error: { code: 'FORBIDDEN' } }, { status: 403 })
 
   const { id } = await params
-  const body = await request.json() as { status?: 'confirmed' | 'cancelled' }
+  const body = await request.json() as { action: 'confirm' | 'cancel' }
 
-  if (!body.status || !['confirmed', 'cancelled'].includes(body.status))
-    return NextResponse.json({ error: { code: 'VALIDATION', message: 'status harus confirmed atau cancelled.' } }, { status: 400 })
+  if (!body.action || !['confirm', 'cancel'].includes(body.action))
+    return NextResponse.json({ error: { code: 'VALIDATION', message: 'action harus confirm atau cancel.' } }, { status: 400 })
 
-  // Ambil booking sebelum update (perlu email + slot_id untuk hapus dari Calendar)
   const admin = createAdminClient()
   const { data: booking } = await admin
     .from('consultation_bookings')
-    .select('customer_email, slot_id, status')
+    .select('slot_id, status, amount')
     .eq('id', id)
     .single()
 
-  const { data, error } = await supabase
+  if (!booking) return NextResponse.json({ error: { code: 'NOT_FOUND' } }, { status: 404 })
+
+  // Validasi transisi status
+  if (body.action === 'confirm' && !['pending_payment', 'expired'].includes(booking.status))
+    return NextResponse.json({ error: { code: 'VALIDATION', message: 'Hanya booking pending atau expired yang bisa dikonfirmasi.' } }, { status: 400 })
+
+  if (body.action === 'cancel' && booking.status === 'cancelled')
+    return NextResponse.json({ error: { code: 'VALIDATION', message: 'Booking sudah dibatalkan.' } }, { status: 400 })
+
+  const newStatus = body.action === 'confirm' ? 'confirmed' as const : 'cancelled' as const
+  const updateData = newStatus === 'confirmed'
+    ? { status: newStatus, paid_at: new Date().toISOString() }
+    : { status: newStatus }
+
+  const { data, error } = await admin
     .from('consultation_bookings')
-    .update({ status: body.status })
+    .update(updateData)
     .eq('id', id)
     .select()
     .single()
 
   if (error) return NextResponse.json({ error: { code: 'DB_ERROR', message: error.message } }, { status: 500 })
-  if (!data)  return NextResponse.json({ error: { code: 'NOT_FOUND' } }, { status: 404 })
 
-  // Update deskripsi Calendar jika booking dibatalkan
-  if (body.status === 'cancelled' && booking?.status === 'confirmed' && isGoogleCalendarConfigured()) {
-    updateCalendarAfterCancel(admin, booking.slot_id).catch(err =>
-      console.error('[Calendar] cancel update error:', err)
-    )
+  // Sync Calendar
+  if (isGoogleCalendarConfigured()) {
+    rebuildCalendarDescription(admin, booking.slot_id)
+      .catch(err => console.error('[Calendar] sync error after admin action:', err))
   }
 
   return NextResponse.json({ data })
 }
 
-async function updateCalendarAfterCancel(
+async function rebuildCalendarDescription(
   admin: ReturnType<typeof createAdminClient>,
   slotId: string,
 ) {

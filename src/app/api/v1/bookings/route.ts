@@ -1,16 +1,17 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { sendBookingConfirmWa } from '@/lib/messaging'
 import { isGoogleCalendarConfigured, updateEventDescription } from '@/lib/google-calendar'
+import { isMidtransConfigured, createQris } from '@/lib/midtrans'
 
-// POST /api/v1/bookings — publik (anon), buat booking via DB function (anti-overbooking)
+// POST /api/v1/bookings — publik (anon), buat booking + QRIS pembayaran
 export async function POST(request: Request) {
   let body: {
     slot_id:        string
     customer_name:  string
     customer_phone: string
     customer_email?: string
+    qty?:           number
     notes?:         string
   }
   try { body = await request.json() } catch {
@@ -20,18 +21,21 @@ export async function POST(request: Request) {
   if (!body.slot_id || !body.customer_name || !body.customer_phone)
     return NextResponse.json({ error: { code: 'VALIDATION', message: 'slot_id, customer_name, customer_phone wajib.' } }, { status: 400 })
 
+  const qty = Math.max(1, Math.floor(body.qty ?? 1))
+
   const admin = createAdminClient()
   const { data, error } = await admin.rpc('check_and_create_booking', {
     p_slot_id:        body.slot_id,
     p_customer_name:  body.customer_name,
     p_customer_phone: body.customer_phone,
     p_customer_email: body.customer_email ?? null,
+    p_qty:            qty,
     p_notes:          body.notes ?? null,
   })
 
   if (error) {
     const msg = error.message
-    const isClient = msg.includes('penuh') || msg.includes('tidak ditemukan') || msg.includes('tidak tersedia') || msg.includes('lewat')
+    const isClient = msg.includes('penuh') || msg.includes('tidak ditemukan') || msg.includes('tidak tersedia') || msg.includes('lewat') || msg.includes('minimal')
     return NextResponse.json({ error: { code: 'BOOKING_ERROR', message: msg } }, { status: isClient ? 422 : 500 })
   }
 
@@ -42,22 +46,78 @@ export async function POST(request: Request) {
     start_time:   string
     end_time:     string
     max_bookings: number
+    price:        number
+    qty:          number
+    amount:       number
+    expires_at:   string
     filled:       number
   }
 
-  // WA konfirmasi (non-blocking)
-  sendBookingConfirmWa(result.booking_id).catch(() => {})
-
-  // Google Calendar (non-blocking)
-  if (isGoogleCalendarConfigured()) {
-    syncCalendar({ slotId: body.slot_id, maxBookings: result.max_bookings })
-      .catch(err => console.error('[Calendar] syncCalendar error:', err))
+  // Jika gratis (amount = 0), langsung confirm tanpa perlu pembayaran
+  if (result.amount === 0) {
+    await admin
+      .from('consultation_bookings')
+      .update({ status: 'confirmed', paid_at: new Date().toISOString() })
+      .eq('id', result.booking_id)
+    if (isGoogleCalendarConfigured()) {
+      syncCalendar({ slotId: body.slot_id, maxBookings: result.max_bookings })
+        .catch(() => {})
+    }
+    return NextResponse.json({
+      data: {
+        booking_id:   result.booking_id,
+        queue_number: result.queue_number,
+        slot_date:    result.slot_date,
+        start_time:   result.start_time,
+        end_time:     result.end_time,
+        qty:          result.qty,
+        price:        0,
+        amount:       0,
+        expires_at:   null,
+        qris:         null,
+      },
+    }, { status: 201 })
   }
 
-  return NextResponse.json({ data: result }, { status: 201 })
+  // Buat QRIS (jika Midtrans terkonfigurasi dan ada nominal)
+  let qris: { qr_string: string; expire_time: string } | null = null
+  if (isMidtransConfigured() && result.amount > 0) {
+    try {
+      const qrisResult = await createQris({
+        orderId:      result.booking_id,
+        amount:       result.amount,
+        customerName: body.customer_name,
+      })
+      qris = { qr_string: qrisResult.qr_string, expire_time: qrisResult.expire_time }
+
+      // Simpan external_id ke booking
+      await admin
+        .from('consultation_bookings')
+        .update({ payment_external_id: result.booking_id })
+        .eq('id', result.booking_id)
+    } catch (err) {
+      console.error('[Midtrans] gagal buat QRIS:', err)
+      // Lanjut tanpa QRIS — admin bisa confirm manual
+    }
+  }
+
+  return NextResponse.json({
+    data: {
+      booking_id:   result.booking_id,
+      queue_number: result.queue_number,
+      slot_date:    result.slot_date,
+      start_time:   result.start_time,
+      end_time:     result.end_time,
+      qty:          result.qty,
+      price:        result.price,
+      amount:       result.amount,
+      expires_at:   result.expires_at,
+      qris,
+    },
+  }, { status: 201 })
 }
 
-// syncCalendar: update deskripsi event yang sudah ada dengan semua booking aktif
+// syncCalendar: update deskripsi event yang sudah ada dengan semua booking confirmed
 async function syncCalendar(opts: { slotId: string; maxBookings: number }) {
   const admin = createAdminClient()
 
@@ -68,7 +128,7 @@ async function syncCalendar(opts: { slotId: string; maxBookings: number }) {
     .single()
 
   if (slotErr) { console.error('[Calendar] gagal ambil slot:', slotErr.message); return }
-  if (!slot?.calendar_event_id) return  // slot belum punya event (generate sebelum fitur ini)
+  if (!slot?.calendar_event_id) return
 
   const { data: bookings } = await admin
     .from('consultation_bookings')
@@ -88,8 +148,10 @@ async function syncCalendar(opts: { slotId: string; maxBookings: number }) {
     })),
   })
 
-  console.log(`[Calendar] Updated event ${slot.calendar_event_id} (${bookings?.length ?? 0} booking)`)
+  console.log(`[Calendar] Updated event ${slot.calendar_event_id} (${bookings?.length ?? 0} booking confirmed)`)
 }
+
+export { syncCalendar }
 
 // GET /api/v1/bookings?slot_id=&status= — manager only
 export async function GET(request: Request) {
@@ -108,11 +170,11 @@ export async function GET(request: Request) {
 
   let query = supabase
     .from('consultation_bookings')
-    .select('id, slot_id, customer_name, customer_phone, customer_email, status, notes, queue_number, created_at')
+    .select('id, slot_id, customer_name, customer_phone, customer_email, qty, status, amount, expires_at, paid_at, notes, queue_number, created_at')
     .order('queue_number')
 
   if (slotId) query = query.eq('slot_id', slotId)
-  if (status) query = query.eq('status', status as 'confirmed' | 'cancelled')
+  if (status) query = query.eq('status', status as 'pending_payment' | 'confirmed' | 'cancelled' | 'expired')
 
   const { data, error } = await query
   if (error) return NextResponse.json({ error: { code: 'DB_ERROR', message: error.message } }, { status: 500 })

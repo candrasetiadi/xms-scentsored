@@ -229,15 +229,15 @@ export type Database = {
       }
       // ── M8 Booking ─────────────────────────────────────────────────────────
       consultation_slots: {
-        Row: { id: string; branch_id: string; date: string; start_time: string; end_time: string; max_bookings: number; notes: string | null; is_active: boolean; calendar_event_id: string | null; created_at: string }
-        Insert: { id?: string; branch_id: string; date: string; start_time: string; end_time: string; max_bookings?: number; notes?: string | null; is_active?: boolean; calendar_event_id?: string | null; created_at?: string }
-        Update: { date?: string; start_time?: string; end_time?: string; max_bookings?: number; notes?: string | null; is_active?: boolean; calendar_event_id?: string | null }
+        Row: { id: string; branch_id: string; date: string; start_time: string; end_time: string; max_bookings: number; price: number; notes: string | null; is_active: boolean; calendar_event_id: string | null; created_at: string }
+        Insert: { id?: string; branch_id: string; date: string; start_time: string; end_time: string; max_bookings?: number; price?: number; notes?: string | null; is_active?: boolean; calendar_event_id?: string | null; created_at?: string }
+        Update: { date?: string; start_time?: string; end_time?: string; max_bookings?: number; price?: number; notes?: string | null; is_active?: boolean; calendar_event_id?: string | null }
         Relationships: []
       }
       consultation_bookings: {
-        Row: { id: string; slot_id: string; customer_name: string; customer_phone: string; customer_email: string | null; status: 'confirmed' | 'cancelled'; notes: string | null; queue_number: number; created_at: string }
-        Insert: { id?: string; slot_id: string; customer_name: string; customer_phone: string; customer_email?: string | null; status?: 'confirmed' | 'cancelled'; notes?: string | null; queue_number: number; created_at?: string }
-        Update: { status?: 'confirmed' | 'cancelled'; notes?: string | null }
+        Row: { id: string; slot_id: string; customer_name: string; customer_phone: string; customer_email: string | null; qty: number; status: 'pending_payment' | 'confirmed' | 'cancelled' | 'expired'; queue_number: number; expires_at: string | null; payment_external_id: string | null; paid_at: string | null; amount: number; notes: string | null; created_at: string }
+        Insert: { id?: string; slot_id: string; customer_name: string; customer_phone: string; customer_email?: string | null; qty?: number; status?: 'pending_payment' | 'confirmed' | 'cancelled' | 'expired'; queue_number: number; expires_at?: string | null; payment_external_id?: string | null; paid_at?: string | null; amount?: number; notes?: string | null; created_at?: string }
+        Update: { status?: 'pending_payment' | 'confirmed' | 'cancelled' | 'expired'; qty?: number; expires_at?: string | null; payment_external_id?: string | null; paid_at?: string | null; amount?: number; notes?: string | null }
         Relationships: []
       }
       // ── M9 Notifications ───────────────────────────────────────────────────

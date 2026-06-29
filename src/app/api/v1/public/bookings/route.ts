@@ -1,8 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import { timingSafeEqual } from 'crypto'
-import { sendBookingConfirmWa } from '@/lib/messaging'
-import { isGoogleCalendarConfigured, updateEventDescription } from '@/lib/google-calendar'
+import { isMidtransConfigured, createSnapToken } from '@/lib/midtrans'
 
 // ── CORS helpers ───────────────────────────────────────────────────────────────
 
@@ -42,17 +41,13 @@ function validateApiKey(request: Request): boolean {
 //   slot_id        string  — wajib
 //   customer_name  string  — wajib
 //   customer_phone string  — wajib
-//   customer_email string  — opsional (untuk notifikasi)
+//   customer_email string  — opsional
+//   qty            number  — default 1
 //   notes          string  — opsional
 //
 // Response 201:
-//   { data: { booking_id, queue_number, slot_date, start_time, end_time } }
-//
-// Response errors:
-//   401 — X-API-Key tidak valid
-//   400 — field wajib kosong
-//   422 — slot penuh / tidak tersedia / sudah lewat
-//   500 — server error
+//   { data: { booking_id, queue_number, slot_date, start_time, end_time,
+//             qty, price, amount, expires_at, snap_token, payment_url } }
 
 export async function POST(request: Request) {
   if (!validateApiKey(request)) {
@@ -67,6 +62,7 @@ export async function POST(request: Request) {
     customer_name:   string
     customer_phone:  string
     customer_email?: string
+    qty?:            number
     notes?:          string
   }
   try { body = await request.json() } catch {
@@ -83,72 +79,78 @@ export async function POST(request: Request) {
     )
   }
 
+  const qty   = Math.max(1, Math.floor(body.qty ?? 1))
   const admin = createAdminClient()
+
   const { data, error } = await admin.rpc('check_and_create_booking', {
     p_slot_id:        body.slot_id,
     p_customer_name:  body.customer_name,
     p_customer_phone: body.customer_phone,
     p_customer_email: body.customer_email ?? null,
+    p_qty:            qty,
     p_notes:          body.notes ?? null,
   })
 
   if (error) {
     const msg      = error.message
-    const isClient = msg.includes('penuh') || msg.includes('tidak ditemukan') || msg.includes('tidak tersedia') || msg.includes('lewat')
+    const isClient = msg.includes('penuh') || msg.includes('tidak ditemukan') || msg.includes('tidak tersedia') || msg.includes('lewat') || msg.includes('minimal')
     return NextResponse.json(
       { error: { code: 'BOOKING_ERROR', message: msg } },
       { status: isClient ? 422 : 500, headers: corsHeaders(request) },
     )
   }
 
-  const result = data as {
+  const result = (data as unknown) as {
     booking_id:   string
     queue_number: number
     slot_date:    string
     start_time:   string
     end_time:     string
     max_bookings: number
-    filled:       number
+    price:        number
+    qty:          number
+    amount:       number
+    expires_at:   string
   }
 
-  // WA konfirmasi (non-blocking)
-  sendBookingConfirmWa(result.booking_id).catch(() => {})
+  // Buat Midtrans Snap token untuk website eksternal
+  let snapToken:    string | null = null
+  let paymentUrl:   string | null = null
 
-  // Google Calendar (non-blocking)
-  if (isGoogleCalendarConfigured()) {
-    syncCalendar({ slotId: body.slot_id, maxBookings: result.max_bookings })
-      .catch(err => console.error('[Calendar/public] syncCalendar error:', err))
+  if (isMidtransConfigured() && result.amount > 0) {
+    try {
+      const snap = await createSnapToken({
+        orderId:       result.booking_id,
+        amount:        result.amount,
+        customerName:  body.customer_name,
+        customerPhone: body.customer_phone,
+        customerEmail: body.customer_email,
+      })
+      snapToken  = snap.token
+      paymentUrl = snap.redirect_url
+
+      await admin
+        .from('consultation_bookings')
+        .update({ payment_external_id: result.booking_id })
+        .eq('id', result.booking_id)
+    } catch (err) {
+      console.error('[Midtrans/public] gagal buat Snap token:', err)
+    }
   }
 
-  return NextResponse.json({ data: result }, { status: 201, headers: corsHeaders(request) })
-}
-
-async function syncCalendar(opts: { slotId: string; maxBookings: number }) {
-  const admin = createAdminClient()
-
-  const { data: slot } = await admin
-    .from('consultation_slots')
-    .select('calendar_event_id, branches!inner(name)')
-    .eq('id', opts.slotId)
-    .single()
-
-  if (!slot?.calendar_event_id) return
-
-  const { data: bookings } = await admin
-    .from('consultation_bookings')
-    .select('queue_number, customer_name, customer_phone')
-    .eq('slot_id', opts.slotId)
-    .eq('status', 'confirmed')
-    .order('queue_number')
-
-  await updateEventDescription({
-    eventId:     slot.calendar_event_id as string,
-    branchName:  ((slot.branches as unknown) as { name: string }).name,
-    maxBookings: opts.maxBookings,
-    bookings:    (bookings ?? []).map(b => ({
-      queueNumber: b.queue_number,
-      name:        b.customer_name,
-      phone:       b.customer_phone,
-    })),
-  })
+  return NextResponse.json({
+    data: {
+      booking_id:   result.booking_id,
+      queue_number: result.queue_number,
+      slot_date:    result.slot_date,
+      start_time:   result.start_time,
+      end_time:     result.end_time,
+      qty:          result.qty,
+      price:        result.price,
+      amount:       result.amount,
+      expires_at:   result.expires_at,
+      snap_token:   snapToken,
+      payment_url:  paymentUrl,
+    },
+  }, { status: 201, headers: corsHeaders(request) })
 }
