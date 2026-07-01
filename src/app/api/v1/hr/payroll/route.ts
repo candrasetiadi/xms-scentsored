@@ -18,18 +18,19 @@ export async function GET(request: Request) {
   if (!isManager) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { searchParams } = new URL(request.url)
-  const branchId = searchParams.get('branch_id') ?? staff.branch_id
+  const branchParam = searchParams.get('branch_id') ?? staff.branch_id
   const yearParam = searchParams.get('year')
 
-  if (!branchId || !UUID_RE.test(branchId))
-    return NextResponse.json({ error: 'branch_id wajib dan harus UUID valid.' }, { status: 400 })
+  if (branchParam && !UUID_RE.test(branchParam))
+    return NextResponse.json({ error: 'branch_id harus UUID valid.' }, { status: 400 })
 
   let query = supabase
     .from('payroll_runs')
     .select('*, branch:branch_id (id, name)')
-    .eq('branch_id', branchId)
     .order('period_year', { ascending: false })
     .order('period_month', { ascending: false })
+
+  if (branchParam) query = query.eq('branch_id', branchParam)
 
   if (yearParam) {
     const year = parseInt(yearParam)

@@ -15,18 +15,27 @@ export async function GET(request: Request) {
     .from('staff').select('id, role, branch_id').eq('auth_user_id', user.id).eq('active', true).single()
   if (!staff) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const isManager = ['owner', 'admin'].includes(staff.role)
   const { searchParams } = new URL(request.url)
-  const branchId = searchParams.get('branch_id') ?? staff.branch_id
+  const branchParam = searchParams.get('branch_id') ?? staff.branch_id
 
-  if (!branchId || !UUID_RE.test(branchId))
+  // Non-manager must have a branch_id resolved
+  if (!isManager && (!branchParam || !UUID_RE.test(branchParam)))
     return NextResponse.json({ error: 'branch_id wajib dan harus UUID valid.' }, { status: 400 })
 
-  const { data, error } = await supabase
-    .from('shifts')
-    .select('*')
-    .eq('active', true)
-    .or(`branch_id.is.null,branch_id.eq.${branchId}`)
-    .order('name')
+  // Manager with explicit branch filter: validate UUID
+  if (isManager && branchParam && !UUID_RE.test(branchParam))
+    return NextResponse.json({ error: 'branch_id harus UUID valid.' }, { status: 400 })
+
+  let query = supabase.from('shifts').select('*').eq('active', true).order('name')
+
+  if (branchParam) {
+    // Show global shifts + shifts for this specific branch
+    query = query.or(`branch_id.is.null,branch_id.eq.${branchParam}`)
+  }
+  // Manager with no branch filter: return all shifts (global + all branches)
+
+  const { data, error } = await query
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
