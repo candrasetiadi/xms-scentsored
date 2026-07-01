@@ -16,9 +16,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: { code: 'FORBIDDEN', message: 'Hanya kasir, admin, atau owner.' } }, { status: 403 })
   }
 
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
   const body = await request.json() as {
     branch_id?:        string
     driver_id?:        string | null
+    sales_staff_id?:   string | null
     customer_name?:    string
     customer_phone?:   string
     discount?:         number
@@ -28,6 +31,10 @@ export async function POST(request: Request) {
   const branchId = body.branch_id ?? staff.branch_id
   if (!branchId) return NextResponse.json({ error: { code: 'VALIDATION', message: 'branch_id wajib.' } }, { status: 400 })
   if (!body.items?.length) return NextResponse.json({ error: { code: 'VALIDATION', message: 'Minimal 1 item.' } }, { status: 400 })
+
+  if (body.sales_staff_id != null && !UUID_RE.test(body.sales_staff_id)) {
+    return NextResponse.json({ error: { code: 'VALIDATION', message: 'sales_staff_id harus UUID valid.' } }, { status: 400 })
+  }
 
   // Validasi sederhana per item
   for (const item of body.items) {
@@ -52,7 +59,21 @@ export async function POST(request: Request) {
 
   if (error) return NextResponse.json({ error: { code: 'DB_ERROR', message: error.message } }, { status: 500 })
 
-  return NextResponse.json({ data: data as CreateOrderResult }, { status: 201 })
+  const result = data as CreateOrderResult
+
+  // Sisipkan sales_staff_id setelah order dibuat — kolom ini opsional
+  // dan tidak perlu atomik dengan create_order_tx.
+  if (body.sales_staff_id) {
+    const { error: updateErr } = await supabase
+      .from('orders')
+      .update({ sales_staff_id: body.sales_staff_id })
+      .eq('id', result.id)
+    if (updateErr) {
+      return NextResponse.json({ error: { code: 'DB_ERROR', message: updateErr.message } }, { status: 500 })
+    }
+  }
+
+  return NextResponse.json({ data: result }, { status: 201 })
 }
 
 // GET /api/v1/orders?branch_id=&status=&date=&limit=&offset=

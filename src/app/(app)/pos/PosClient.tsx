@@ -12,6 +12,8 @@ interface Product {
 
 interface Driver { id: string; name: string; fee_value: number; type: string }
 
+interface StaffMember { id: string; name: string; role: string }
+
 interface EdcMachine { id: string; bank_name: string; terminal_id: string | null; label: string }
 
 interface CartItem {
@@ -102,6 +104,11 @@ export function PosClient({
   const [qrisPolling,  setQrisPolling]  = useState(false)
   const qrisTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
+  // Sales/PIC state
+  const [salesStaffId,   setSalesStaffId]   = useState<string>('')
+  const [salesStaffName, setSalesStaffName] = useState<string>('')
+  const [staffList,      setStaffList]      = useState<StaffMember[]>([])
+
   // Custom racik modal
   const [customProduct, setCustomProduct] = useState<Product | null>(null)
   const [customNotes,   setCustomNotes]   = useState('')
@@ -132,6 +139,18 @@ export function PosClient({
 
   // Cleanup QRIS polling on unmount
   useEffect(() => () => { if (qrisTimerRef.current) clearInterval(qrisTimerRef.current) }, [])
+
+  // Load PIC from localStorage & fetch staff list
+  useEffect(() => {
+    const savedId   = localStorage.getItem('pos_sales_staff_id')   ?? ''
+    const savedName = localStorage.getItem('pos_sales_staff_name') ?? ''
+    if (savedId) { setSalesStaffId(savedId); setSalesStaffName(savedName) }
+
+    fetch(`/api/v1/staff?branch_id=${branchId}`)
+      .then(r => r.json())
+      .then(j => { if (Array.isArray(j.data)) setStaffList(j.data) })
+      .catch(() => {})
+  }, [branchId])
 
   // ── Cart ops ───────────────────────────────────────────────────────────────
 
@@ -198,6 +217,18 @@ export function PosClient({
     if (qrisTimerRef.current) { clearInterval(qrisTimerRef.current); qrisTimerRef.current = null }
   }
 
+  function selectSalesStaff(id: string, name: string) {
+    setSalesStaffId(id)
+    setSalesStaffName(name)
+    if (id) {
+      localStorage.setItem('pos_sales_staff_id',   id)
+      localStorage.setItem('pos_sales_staff_name', name)
+    } else {
+      localStorage.removeItem('pos_sales_staff_id')
+      localStorage.removeItem('pos_sales_staff_name')
+    }
+  }
+
   async function handleQrisGenerate() {
     setLoading(true)
     setErrorMsg(null)
@@ -209,8 +240,11 @@ export function PosClient({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          branch_id: branchId, driver_id: driverId || null,
-          customer_name: custName || null, customer_phone: custPhone || null,
+          branch_id:      branchId,
+          driver_id:      driverId || null,
+          sales_staff_id: salesStaffId || null,
+          customer_name:  custName || null,
+          customer_phone: custPhone || null,
           discount,
           items: cart.map(i => ({
             product_id: i.product.id, qty: i.qty, unit_price: i.unit_price,
@@ -291,6 +325,7 @@ export function PosClient({
         body: JSON.stringify({
           branch_id:      branchId,
           driver_id:      driverId || null,
+          sales_staff_id: salesStaffId || null,
           customer_name:  custName || null,
           customer_phone: custPhone || null,
           discount,
@@ -545,6 +580,10 @@ export function PosClient({
           updateQty={updateQty} removeItem={removeItem}
           onCheckout={openPayModal}
           inputCls={inputCls}
+          staffList={staffList}
+          salesStaffId={salesStaffId}
+          salesStaffName={salesStaffName}
+          onSalesSelect={selectSalesStaff}
         />
       </div>
 
@@ -579,6 +618,10 @@ export function PosClient({
                 updateQty={updateQty} removeItem={removeItem}
                 onCheckout={openPayModal}
                 inputCls={inputCls}
+                staffList={staffList}
+                salesStaffId={salesStaffId}
+                salesStaffName={salesStaffName}
+                onSalesSelect={selectSalesStaff}
               />
             </div>
           </div>
@@ -967,6 +1010,108 @@ function CustomerSearchInput({
   )
 }
 
+// ── SalesPicker ───────────────────────────────────────────────────────────────
+
+const STAFF_ROLE_LABEL: Record<string, string> = {
+  owner: 'Owner', admin: 'Admin', cashier: 'Kasir',
+  perfumer: 'Peracik', stock_keeper: 'Stock Keeper',
+}
+
+interface SalesPickerProps {
+  staffList:     StaffMember[]
+  salesStaffId:  string
+  salesStaffName: string
+  onSelect:      (id: string, name: string) => void
+  inputCls:      string
+}
+
+function SalesPicker({ staffList, salesStaffId, salesStaffName, onSelect }: SalesPickerProps) {
+  const [open, setOpen] = useState(false)
+  const containerRef    = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function onMouseDown(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onMouseDown)
+    return () => document.removeEventListener('mousedown', onMouseDown)
+  }, [])
+
+  return (
+    <div ref={containerRef} className="relative">
+      {salesStaffId ? (
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="bg-pine-50 border border-pine-200 text-pine text-xs rounded-full px-3 py-1 font-medium flex items-center gap-1.5">
+            <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 16 16" stroke="currentColor" strokeWidth="2">
+              <circle cx="8" cy="6" r="3"/>
+              <path d="M2 14c0-3.3 2.7-6 6-6s6 2.7 6 6" strokeLinecap="round"/>
+            </svg>
+            {salesStaffName}
+          </span>
+          <button
+            type="button"
+            onClick={() => setOpen(o => !o)}
+            className="p-1 text-ink-400 hover:text-pine transition-colors"
+            title="Ganti Sales/PIC"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 16 16" stroke="currentColor" strokeWidth="2">
+              <path d="M11 2l3 3-8 8H3v-3l8-8z" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+          <button
+            type="button"
+            onClick={() => onSelect('', '')}
+            className="p-1 text-ink-400 hover:text-danger transition-colors"
+            title="Hapus Sales/PIC"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 16 16" stroke="currentColor" strokeWidth="2">
+              <path d="M4 4l8 8M4 12l8-8" strokeLinecap="round"/>
+            </svg>
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setOpen(o => !o)}
+          className="flex items-center gap-2 text-ink-400 hover:text-ink-700 transition-colors w-full"
+        >
+          <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 16 16" stroke="currentColor" strokeWidth="2">
+            <circle cx="8" cy="6" r="3"/>
+            <path d="M2 14c0-3.3 2.7-6 6-6s6 2.7 6 6" strokeLinecap="round"/>
+          </svg>
+          <span className="text-[13px]">Pilih Sales/PIC</span>
+        </button>
+      )}
+
+      {open && (
+        <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-white border border-line rounded-lg shadow-lg overflow-hidden">
+          {staffList.length === 0 ? (
+            <p className="text-xs text-ink-400 px-3 py-2.5">Tidak ada staff tersedia.</p>
+          ) : (
+            staffList.map(s => (
+              <button
+                key={s.id}
+                type="button"
+                onMouseDown={e => { e.preventDefault(); onSelect(s.id, s.name); setOpen(false) }}
+                className={`w-full flex items-center justify-between px-3 py-2.5 hover:bg-sand-50 text-left transition-colors ${
+                  s.id === salesStaffId ? 'bg-pine-50' : ''
+                }`}
+              >
+                <span className="text-[13px] font-medium text-ink-900 truncate">{s.name}</span>
+                <span className="text-[11px] text-ink-400 ml-2 shrink-0">
+                  {STAFF_ROLE_LABEL[s.role] ?? s.role}
+                </span>
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── CartPanel ─────────────────────────────────────────────────────────────────
 
 interface CartPanelProps {
@@ -987,6 +1132,10 @@ interface CartPanelProps {
   removeItem:     (idx: number) => void
   onCheckout:     () => void
   inputCls:       string
+  staffList:      StaffMember[]
+  salesStaffId:   string
+  salesStaffName: string
+  onSalesSelect:  (id: string, name: string) => void
 }
 
 function CartPanel({
@@ -996,6 +1145,7 @@ function CartPanel({
   setDiscount, setDriverId, setCustName, setCustPhone,
   updateQty, removeItem, onCheckout,
   inputCls,
+  staffList, salesStaffId, salesStaffName, onSalesSelect,
 }: CartPanelProps) {
   const isEmpty    = cart.length === 0
   const cartCount  = cart.reduce((s, i) => s + i.qty, 0)
@@ -1011,6 +1161,17 @@ function CartPanel({
             {cartCount}
           </span>
         )}
+      </div>
+
+      {/* Sales/PIC section — always visible */}
+      <div className="px-3 py-2.5 border-b border-line flex-shrink-0">
+        <SalesPicker
+          staffList={staffList}
+          salesStaffId={salesStaffId}
+          salesStaffName={salesStaffName}
+          onSelect={onSalesSelect}
+          inputCls={inputCls}
+        />
       </div>
 
       {/* Customer section — above items */}

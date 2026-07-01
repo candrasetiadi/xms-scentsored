@@ -100,9 +100,9 @@ export type Database = {
       }
       // ── M4 + M7 + M10 ─────────────────────────────────────────────────────
       orders: {
-        Row: { id: string; branch_id: string; order_number: string; queue_number: number; customer_id: string | null; staff_id: string | null; driver_id: string | null; status: 'draft' | 'awaiting_payment' | 'paid' | 'in_production' | 'ready' | 'completed' | 'cancelled'; subtotal: number; discount: number; total: number; paid_at: string | null; created_at: string }
-        Insert: { id?: string; branch_id: string; order_number: string; queue_number: number; customer_id?: string | null; staff_id?: string | null; driver_id?: string | null; status?: 'draft' | 'awaiting_payment' | 'paid' | 'in_production' | 'ready' | 'completed' | 'cancelled'; subtotal?: number; discount?: number; total?: number; paid_at?: string | null; created_at?: string }
-        Update: { status?: 'draft' | 'awaiting_payment' | 'paid' | 'in_production' | 'ready' | 'completed' | 'cancelled'; paid_at?: string | null }
+        Row: { id: string; branch_id: string; order_number: string; queue_number: number; customer_id: string | null; staff_id: string | null; driver_id: string | null; sales_staff_id: string | null; status: 'draft' | 'awaiting_payment' | 'paid' | 'in_production' | 'ready' | 'completed' | 'cancelled'; subtotal: number; discount: number; total: number; paid_at: string | null; created_at: string }
+        Insert: { id?: string; branch_id: string; order_number: string; queue_number: number; customer_id?: string | null; staff_id?: string | null; driver_id?: string | null; sales_staff_id?: string | null; status?: 'draft' | 'awaiting_payment' | 'paid' | 'in_production' | 'ready' | 'completed' | 'cancelled'; subtotal?: number; discount?: number; total?: number; paid_at?: string | null; created_at?: string }
+        Update: { status?: 'draft' | 'awaiting_payment' | 'paid' | 'in_production' | 'ready' | 'completed' | 'cancelled'; paid_at?: string | null; sales_staff_id?: string | null }
         Relationships: []
       }
       order_items: {
@@ -351,6 +351,8 @@ export type Database = {
       get_production_report:         { Args: { p_branch_id: string; p_from: string; p_to: string }; Returns: ProductionReport }
       // M8 Booking
       check_and_create_booking:      { Args: { p_slot_id: string; p_customer_name: string; p_customer_phone: string; p_customer_email?: string | null; p_notes?: string | null }; Returns: CheckBookingResult }
+      // Dashboard
+      get_dashboard_stats:           { Args: { p_branch_id: string | null; p_from: string; p_to: string }; Returns: DashboardStats }
     }
     Enums: Record<string, never>
   }
@@ -482,6 +484,44 @@ export interface DriverFeeReportRow {
   total_fee:     number
   total_accrued: number
   total_paid:    number
+}
+
+// ── Dashboard ─────────────────────────────────────────────────────────────────
+
+export interface DashboardStats {
+  summary: {
+    total_revenue:   number
+    total_orders:    number
+    avg_order_value: number
+  }
+  top_sales: {
+    staff_id:    string
+    staff_name:  string
+    order_count: number
+    revenue:     number
+  }[]
+  top_drivers: {
+    driver_id:   string
+    driver_name: string
+    order_count: number
+    revenue:     number
+    fee_amount:  number
+  }[]
+  low_stock_products: {
+    product_id:   string
+    product_name: string
+    sku:          string
+    stock:        number
+    reorder_level: number
+    branch_name?: string
+  }[]
+  low_stock_materials: {
+    raw_material_id: string
+    name:            string
+    unit:            string
+    qty_remaining:   number
+    reorder_level:   number
+  }[]
 }
 
 // Convenience row types
