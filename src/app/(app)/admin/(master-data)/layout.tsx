@@ -7,8 +7,9 @@ const ADMIN_NAV = [
   { label: 'Bahan Baku',   href: '/admin/raw-materials' },
   { label: 'Resep / BOM',  href: '/admin/recipes' },
   { label: 'Supplier',     href: '/admin/suppliers' },
-  { label: 'Driver',       href: '/admin/drivers' },
-  { label: 'Pelanggan',    href: '/admin/customers' },
+  { label: 'Driver',            href: '/admin/drivers' },
+  { label: 'Travel Agent',      href: '/admin/travel-agencies' },
+  { label: 'Pelanggan',         href: '/admin/customers' },
 ]
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {

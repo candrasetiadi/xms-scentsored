@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect, useRef } from 'react'
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -345,53 +345,52 @@ export function PosClient({
 
   // ── CSS helpers ────────────────────────────────────────────────────────────
 
-  const inputCls = 'h-10 rounded-md border border-line-strong px-3 text-sm text-ink-900 focus:outline-none focus:border-pine-400 focus:ring-2 focus:ring-pine-100'
+  const inputCls = 'bg-sand-50 border border-line rounded-lg px-3 py-2 text-[13px] text-ink-900 focus:outline-none focus:border-pine-400 focus:ring-2 focus:ring-pine-100 focus:bg-white'
 
   // ── SUCCESS SCREEN ─────────────────────────────────────────────────────────
 
   if (screen === 'success' && successData) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-sand-50 px-4 py-12">
-        <div className="bg-white rounded-xl border border-line shadow-md max-w-sm w-full p-8 text-center">
-          <div className="w-16 h-16 rounded-full bg-success-bg border border-success-bd flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-            </svg>
-          </div>
-          <p className="text-xs text-ink-400 uppercase tracking-widest mb-1">Pembayaran Berhasil</p>
-          <h2 className="font-display text-[32px] text-pine leading-none">#{successData.queue_number}</h2>
-          <p className="text-sm text-ink-400 mt-1">No. antrian hari ini</p>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-pine text-white px-4 py-12">
+        <div className="w-16 h-16 rounded-full bg-white/15 flex items-center justify-center mb-6">
+          <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+          </svg>
+        </div>
 
-          <div className="mt-6 rounded-lg bg-sand-100 border border-line p-4 text-left space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-ink-500">No. Order</span>
-              <span className="font-mono font-medium text-ink-900">{successData.order_number}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-ink-500">Total</span>
-              <span className="font-semibold text-ink-900">{formatRp(successData.total)}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-ink-500">Metode</span>
-              <span className="text-ink-700">{METHOD_LABEL[successData.method]}</span>
-            </div>
-          </div>
+        <p className="text-[11px] text-white/60 uppercase tracking-widest mb-2">Pembayaran Berhasil</p>
+        <h2 className="font-display text-[80px] text-white leading-none">#{successData.queue_number}</h2>
+        <p className="text-[12px] text-white/50 uppercase tracking-wider mt-1">No. antrian hari ini</p>
 
-          <div className="flex gap-2 mt-6">
-            <a
-              href={`/print/receipt/${successData.id}`}
-              target="_blank" rel="noreferrer"
-              className="flex-1 h-11 rounded-md border border-line-strong text-sm font-medium text-ink-700 hover:bg-sand-50 flex items-center justify-center"
-            >
-              Cetak Struk
-            </a>
-            <button
-              onClick={() => { clearCart(); router.refresh() }}
-              className="flex-1 h-11 rounded-md bg-pine text-white font-medium hover:bg-pine-700 transition-colors"
-            >
-              Transaksi Baru
-            </button>
+        <div className="bg-white/10 border border-white/20 rounded-xl p-4 mt-6 w-full max-w-xs space-y-2 text-sm">
+          <div className="flex justify-between">
+            <span className="text-white/60">No. Order</span>
+            <span className="font-mono font-medium text-white">{successData.order_number}</span>
           </div>
+          <div className="flex justify-between">
+            <span className="text-white/60">Total</span>
+            <span className="font-medium text-white">{formatRp(successData.total)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-white/60">Metode</span>
+            <span className="text-white">{METHOD_LABEL[successData.method]}</span>
+          </div>
+        </div>
+
+        <div className="flex gap-3 mt-8">
+          <a
+            href={`/print/receipt/${successData.id}`}
+            target="_blank" rel="noreferrer"
+            className="border border-white/30 text-white/80 rounded-xl px-6 py-3 font-medium hover:bg-white/10 transition-colors"
+          >
+            Cetak Struk
+          </a>
+          <button
+            onClick={() => { clearCart(); router.refresh() }}
+            className="bg-white text-pine font-semibold rounded-xl px-8 py-3 hover:bg-sand-100 transition-colors"
+          >
+            Transaksi Baru
+          </button>
         </div>
       </div>
     )
@@ -403,38 +402,56 @@ export function PosClient({
     <div className="h-[calc(100vh-56px)] flex flex-col lg:flex-row overflow-hidden">
 
       {/* ── LEFT: Product grid ──────────────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-        {/* Toolbar */}
-        <div className="bg-white border-b border-line px-3 py-2 flex gap-2 flex-wrap items-center">
+      <div className="flex-1 flex flex-col min-h-0 overflow-hidden bg-sand-50">
+
+        {/* Toolbar: branch select + search */}
+        <div className="bg-white border-b border-line px-4 py-0 h-14 flex items-center gap-3 flex-shrink-0">
           {branches.length > 0 && (
-            <select className={`${inputCls} text-xs h-8`} value={branchId}
-              onChange={e => router.push(`${pathname}?branch=${e.target.value}`)}>
+            <select
+              className="bg-sand-50 border border-line rounded-lg px-3 py-2 text-[13px] text-ink-900 focus:outline-none focus:border-pine-400 shrink-0 h-9"
+              value={branchId}
+              onChange={e => router.push(`${pathname}?branch=${e.target.value}`)}
+            >
               {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
             </select>
           )}
-          <input
-            className={`${inputCls} flex-1 min-w-[140px] h-8 text-xs`}
-            placeholder="Cari produk atau SKU…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-          {categories.length > 2 && (
-            <div className="flex gap-1 flex-wrap">
-              {categories.map(cat => (
-                <button key={cat} onClick={() => setCategory(cat)}
-                  className={`h-7 px-2.5 rounded-full text-xs font-medium transition-colors ${
-                    category === cat
-                      ? 'bg-pine text-white'
-                      : 'bg-sand-100 text-ink-600 hover:bg-sand-200'
-                  }`}>
-                  {cat === 'semua' ? 'Semua' : cat}
-                </button>
-              ))}
-            </div>
-          )}
+          {/* Search with icon */}
+          <div className="relative flex-1">
+            <svg
+              className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400 pointer-events-none"
+              fill="none" viewBox="0 0 20 20" stroke="currentColor" strokeWidth={2}
+            >
+              <circle cx="9" cy="9" r="6"/><path d="M15 15l3 3" strokeLinecap="round"/>
+            </svg>
+            <input
+              className="bg-sand-50 border border-line-strong rounded-xl pl-9 pr-4 py-2 text-sm w-full focus:outline-none focus:border-pine-400 focus:ring-2 focus:ring-pine-100 focus:bg-white text-ink-900 placeholder:text-ink-400"
+              placeholder="Cari produk atau SKU…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+          </div>
         </div>
 
-        {/* Grid */}
+        {/* Category pills */}
+        {categories.length > 2 && (
+          <div className="flex gap-2 px-4 py-2.5 overflow-x-auto scrollbar-none bg-white border-b border-line flex-shrink-0">
+            {categories.map(cat => (
+              <button
+                key={cat}
+                onClick={() => setCategory(cat)}
+                className={`whitespace-nowrap shrink-0 text-xs font-medium rounded-full px-3.5 py-1.5 transition-colors ${
+                  category === cat
+                    ? 'bg-pine text-white'
+                    : 'bg-sand-100 text-ink-700 border border-transparent hover:bg-sand-200'
+                }`}
+              >
+                {cat === 'semua' ? 'Semua' : cat}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Product grid */}
         <div className="flex-1 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3 p-3 content-start">
           {filteredProducts.length === 0 && (
             <div className="col-span-4 py-16 text-center text-ink-400 text-sm">
@@ -453,58 +470,58 @@ export function PosClient({
                 disabled={isOutOfStock}
                 aria-label={cartItem ? `${product.name}, ${cartItem.qty} di keranjang` : product.name}
                 className={[
-                  'relative rounded-lg text-left transition-all duration-150 shadow-sm',
-                  cartItem ? 'border border-pine bg-pine-50' : 'border border-line bg-white',
+                  'relative rounded-xl text-left transition-all duration-150 shadow-sm cursor-pointer select-none bg-white',
+                  cartItem
+                    ? 'border-2 border-pine bg-pine-50'
+                    : 'border border-line hover:shadow-md hover:border-pine-200',
                   isOutOfStock
-                    ? 'opacity-40 cursor-not-allowed'
-                    : 'hover:border-pine-300 hover:shadow-md hover:-translate-y-0.5 active:scale-[0.97] active:shadow-sm',
+                    ? 'opacity-50 pointer-events-none'
+                    : 'active:scale-[0.97]',
                 ].join(' ')}
               >
-                {/* Gambar 4:3 */}
-                <div className="relative w-full aspect-[4/3] rounded-t-lg overflow-hidden">
+                {/* Image */}
+                <div className="relative w-full aspect-square rounded-t-xl overflow-hidden">
                   {product.image_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
+                    <img src={product.image_url} alt={product.name} className="w-full h-full object-cover bg-sand-100" />
                   ) : (
                     <div className="w-full h-full bg-sand-100 flex items-center justify-center">
-                      <div className="absolute inset-0 flex items-center justify-center text-sand-300">
-                        <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <rect x="10" y="14" width="12" height="14" rx="2" fill="currentColor"/>
-                          <rect x="13" y="10" width="6" height="5" rx="1" fill="currentColor"/>
-                          <rect x="12" y="8" width="8" height="3" rx="1" fill="currentColor"/>
-                          <circle cx="16" cy="7" r="2" fill="currentColor"/>
-                        </svg>
-                      </div>
+                      <svg className="w-8 h-8 text-sand-300" width="32" height="32" viewBox="0 0 32 32" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="10" y="14" width="12" height="14" rx="2"/>
+                        <rect x="13" y="10" width="6" height="5" rx="1"/>
+                        <rect x="12" y="8" width="8" height="3" rx="1"/>
+                        <circle cx="16" cy="7" r="2"/>
+                      </svg>
                     </div>
                   )}
 
-                  {/* Badge tipe */}
-                  <span className={`absolute top-2 left-2 text-[10px] px-1.5 py-0.5 rounded-full font-medium border ${
+                  {/* Type badge */}
+                  <span className={`absolute top-2 left-2 text-[10px] font-semibold rounded-full px-2 py-0.5 ${
                     product.type === 'custom_racik'
-                      ? 'bg-rust-50 border-rust-100 text-rust'
-                      : 'bg-pine-50 border-pine-100 text-pine'
+                      ? 'bg-rust/90 text-white'
+                      : 'bg-pine/90 text-white'
                   }`}>
                     {product.type === 'custom_racik' ? 'Racik' : 'Ready'}
                   </span>
 
-                  {/* Qty badge */}
+                  {/* Cart qty badge */}
                   {cartItem && (
-                    <span className="absolute top-2 right-2 min-w-[22px] h-[22px] rounded-full bg-rust text-white text-[11px] font-bold flex items-center justify-center px-1.5">
+                    <span className="absolute top-2 right-2 bg-pine text-white text-[11px] font-bold w-6 h-6 rounded-full flex items-center justify-center">
                       {cartItem.qty}
                     </span>
                   )}
                 </div>
 
-                {/* Teks */}
+                {/* Content */}
                 <div className="px-3 pt-2.5 pb-3">
                   <p className="text-[13px] font-medium text-ink-900 leading-snug line-clamp-2">{product.name}</p>
-                  <p className="text-[11px] text-ink-400 font-mono mt-0.5">{product.sku}</p>
-                  <div className="mt-2 mb-2 border-t border-line" />
+                  <p className="text-[10px] text-ink-400 font-mono mt-0.5">{product.sku}</p>
+                  <div className="my-2 border-t border-line" />
                   <div className="flex justify-between items-end">
-                    <p className="text-sm font-semibold text-pine">{formatRp(product.price)}</p>
+                    <p className="text-[15px] font-bold text-pine tabular-nums">{formatRp(product.price)}</p>
                     {product.type === 'ready_stock' && stock !== null && (
                       <p className={`text-[11px] ${
-                        stock <= 0 ? 'text-danger' : stock <= 5 ? 'text-warning font-medium' : 'text-ink-400'
+                        stock <= 0 ? 'text-danger font-medium' : stock <= 5 ? 'text-warning font-medium' : 'text-ink-400'
                       }`}>
                         {stock <= 0 ? 'Habis' : stock}
                       </p>
@@ -518,7 +535,7 @@ export function PosClient({
       </div>
 
       {/* ── RIGHT: Cart panel (desktop) ─────────────────────────────────────── */}
-      <div className="hidden lg:flex lg:flex-col lg:w-80 xl:w-96 bg-white border-l border-line">
+      <div className="hidden lg:flex lg:flex-col w-[380px] bg-white border-l border-line">
         <CartPanel
           cart={cart} subtotal={subtotal} discount={discount} total={total}
           driverId={driverId} custName={custName} custPhone={custPhone}
@@ -531,18 +548,18 @@ export function PosClient({
         />
       </div>
 
-      {/* ── MOBILE: Cart button + drawer ────────────────────────────────────── */}
+      {/* ── MOBILE: Floating cart button ────────────────────────────────────── */}
       {cartCount > 0 && !cartOpen && (
-        <div className="lg:hidden fixed bottom-0 left-0 right-0 p-3 bg-white border-t border-line shadow-lg z-30">
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 z-30">
           <button
             onClick={() => setCartOpen(true)}
-            className="w-full h-12 rounded-lg bg-pine text-white font-medium flex items-center justify-between px-4"
+            className="w-full h-14 rounded-none bg-pine text-white font-semibold flex items-center justify-between px-5"
           >
             <span className="bg-white text-pine text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center">
               {cartCount}
             </span>
             <span>Lihat Keranjang</span>
-            <span className="font-semibold">{formatRp(total)}</span>
+            <span className="tabular-nums">{formatRp(total)}</span>
           </button>
         </div>
       )}
@@ -551,15 +568,7 @@ export function PosClient({
       {cartOpen && (
         <div className="lg:hidden fixed inset-0 z-40 flex flex-col">
           <button className="flex-1 bg-black/30" onClick={() => setCartOpen(false)} />
-          <div className="bg-white rounded-t-2xl shadow-xl flex flex-col max-h-[85vh]">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-line">
-              <h2 className="font-semibold text-ink-900">Keranjang</h2>
-              <button onClick={() => setCartOpen(false)} className="text-ink-400 p-1">
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M4 4l12 12M4 16L16 4" strokeLinecap="round"/>
-                </svg>
-              </button>
-            </div>
+          <div className="bg-white rounded-t-2xl shadow-xl flex flex-col max-h-[88vh]">
             <div className="flex-1 overflow-y-auto">
               <CartPanel
                 cart={cart} subtotal={subtotal} discount={discount} total={total}
@@ -579,25 +588,31 @@ export function PosClient({
       {/* ── Custom Racik Modal ──────────────────────────────────────────────── */}
       {customProduct && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
-          <button className="absolute inset-0 bg-black/40" onClick={() => setCustomProduct(null)} />
+          <button className="absolute inset-0 bg-ink-900/50" onClick={() => setCustomProduct(null)} />
           <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md p-5">
-            <h3 className="font-semibold text-ink-900 mb-1">{customProduct.name}</h3>
-            <p className="text-xs text-rust mb-3">Produk Racik — masukkan catatan kustomisasi</p>
+            <div className="flex items-center gap-2 mb-3">
+              <h3 className="font-semibold text-ink-900 text-[16px]">{customProduct.name}</h3>
+              <span className="text-[11px] text-rust bg-rust-50 rounded-full px-2 py-0.5">Racik</span>
+            </div>
             <label className="text-sm font-medium text-ink-700 block mb-1.5">Catatan untuk peracik</label>
             <textarea
-              className="w-full rounded-md border border-line-strong px-3 py-2 text-sm text-ink-900 resize-none focus:outline-none focus:border-pine-400 focus:ring-2 focus:ring-pine-100"
+              className="w-full rounded-lg border border-line-strong px-3 py-2.5 text-sm text-ink-900 resize-none focus:outline-none focus:border-pine-400 focus:ring-2 focus:ring-pine-100"
               rows={3}
               placeholder="mis. lebih woody, kurangi bunga, tambah vanilla…"
               value={customNotes}
               onChange={e => setCustomNotes(e.target.value)}
             />
             <div className="flex gap-2 mt-4">
-              <button onClick={() => setCustomProduct(null)}
-                className="flex-1 h-10 rounded-md border border-line-strong text-sm font-medium text-ink-700 hover:bg-sand-50">
+              <button
+                onClick={() => setCustomProduct(null)}
+                className="flex-1 border border-line-strong text-ink-700 rounded-xl px-4 py-2.5 font-medium hover:bg-sand-50 transition-colors"
+              >
                 Batal
               </button>
-              <button onClick={addCustomToCart}
-                className="flex-1 h-10 rounded-md bg-rust text-white text-sm font-medium hover:bg-rust-600">
+              <button
+                onClick={addCustomToCart}
+                className="flex-1 bg-rust text-white rounded-xl px-4 py-2.5 font-semibold hover:bg-rust-600 transition-colors"
+              >
                 Tambah ke Keranjang
               </button>
             </div>
@@ -605,49 +620,58 @@ export function PosClient({
         </div>
       )}
 
-      {/* ── Payment Method Modal ────────────────────────────────────────────── */}
+      {/* ── Payment Modal ────────────────────────────────────────────────────── */}
       {payModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <button className="absolute inset-0 bg-black/40" onClick={() => setPayModalOpen(false)} />
-          <div className="relative bg-white rounded-t-2xl sm:rounded-xl shadow-xl w-full sm:max-w-md flex flex-col max-h-[92vh]">
+        <div className="fixed inset-0 bg-ink-900/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <button className="absolute inset-0" onClick={() => setPayModalOpen(false)} />
+          <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-xl flex flex-col max-h-[92vh]">
+
             {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-line flex-shrink-0">
-              <div>
-                <h3 className="font-semibold text-ink-900">Pilih Metode Pembayaran</h3>
-                <p className="text-xs text-ink-400 mt-0.5">Total: <span className="font-semibold text-pine">{formatRp(total)}</span></p>
-              </div>
-              <button onClick={() => setPayModalOpen(false)} className="text-ink-400 p-1">
+            <div className="px-5 pt-5 pb-4 border-b border-line flex-shrink-0 relative">
+              <button
+                onClick={() => setPayModalOpen(false)}
+                className="absolute top-4 right-4 text-ink-400 hover:text-ink-900 p-1"
+              >
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M4 4l12 12M4 16L16 4" strokeLinecap="round"/>
                 </svg>
               </button>
+              <p className="text-[11px] text-ink-400 uppercase tracking-widest mb-1">Total Pesanan</p>
+              <p className="text-[36px] font-bold text-ink-900 tabular-nums leading-none">{formatRp(total)}</p>
+              <p className="text-[13px] text-ink-500 mt-1">Pilih metode pembayaran</p>
             </div>
 
-            <div className="overflow-y-auto flex-1 p-4 space-y-3">
+            {/* Body */}
+            <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
+
               {/* Method grid */}
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-3 gap-2.5">
                 {(['cash', 'debit_card', 'credit_card', 'bank_transfer', 'qris'] as PaymentMethod[]).map(m => (
                   <button
                     key={m}
                     onClick={() => { setPayMethod(m); setEdcMachineId('') }}
-                    className={`flex flex-col items-center gap-1.5 rounded-xl border-2 px-2 py-3 transition-all ${
+                    className={`flex flex-col items-center gap-2 rounded-xl border-2 px-2 py-4 cursor-pointer transition-all duration-100 ${
                       payMethod === m
-                        ? 'border-pine bg-pine-50 text-pine'
-                        : 'border-line text-ink-600 hover:border-pine-200 hover:bg-sand-50'
+                        ? 'border-pine bg-pine-50'
+                        : 'border-line bg-sand-50 hover:bg-sand-100 hover:border-line-strong'
                     }`}
                   >
                     <span className="text-xl">{METHOD_ICON[m]}</span>
-                    <span className="text-[11px] font-medium leading-tight text-center">{METHOD_LABEL[m]}</span>
+                    <span className={`text-[11px] font-semibold text-center leading-tight ${
+                      payMethod === m ? 'text-pine' : 'text-ink-600'
+                    }`}>
+                      {METHOD_LABEL[m]}
+                    </span>
                   </button>
                 ))}
               </div>
 
               {/* EDC Machine selector (debit/credit) */}
               {needsEdc && (
-                <div className="mt-1">
+                <div>
                   <p className="text-sm font-medium text-ink-700 mb-2">Pilih Mesin EDC</p>
                   {edcMachines.length === 0 ? (
-                    <p className="text-xs text-warning bg-warning-bg border border-warning-bd rounded-md px-3 py-2">
+                    <p className="text-xs text-warning bg-warning-bg border border-warning-bd rounded-lg px-3 py-2.5">
                       Belum ada mesin EDC terdaftar untuk cabang ini. Hubungi admin.
                     </p>
                   ) : (
@@ -746,17 +770,17 @@ export function PosClient({
               )}
 
               {errorMsg && (
-                <p className="text-xs text-danger bg-danger-bg border border-danger-bd rounded-md px-2.5 py-2">{errorMsg}</p>
+                <p className="bg-danger-bg border border-danger-bd text-danger text-xs rounded-lg px-3 py-2.5">{errorMsg}</p>
               )}
             </div>
 
-            {/* Footer: confirm button */}
-            <div className="px-4 pb-4 pt-2 border-t border-line flex-shrink-0 space-y-2">
+            {/* Footer */}
+            <div className="px-5 pb-6 pt-3 border-t border-line flex-shrink-0 space-y-2">
               {payMethod === 'qris' && !qrisString && (
                 <button
                   onClick={handleQrisGenerate}
                   disabled={loading}
-                  className="w-full h-12 rounded-xl bg-pine text-white font-semibold text-sm hover:bg-pine-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  className="w-full bg-pine hover:bg-pine-700 text-white font-semibold rounded-xl py-3.5 text-[15px] disabled:opacity-40 disabled:pointer-events-none transition-colors"
                 >
                   {loading ? 'Membuat QRIS…' : `Buat QRIS · ${formatRp(total)}`}
                 </button>
@@ -764,7 +788,7 @@ export function PosClient({
               {payMethod === 'qris' && qrisString && (
                 <button
                   onClick={() => { stopQrisPolling(); setQrisString(null); setQrisPolling(false); setQrisOrderId(null) }}
-                  className="w-full h-10 rounded-xl border border-line text-ink-500 text-sm hover:bg-sand-50"
+                  className="w-full rounded-xl border border-line text-ink-500 text-sm py-3 hover:bg-sand-50 transition-colors"
                 >
                   Batalkan & Buat Ulang
                 </button>
@@ -773,7 +797,7 @@ export function PosClient({
                 <button
                   onClick={handlePay}
                   disabled={!canConfirm || loading}
-                  className="w-full h-12 rounded-xl bg-pine text-white font-semibold text-sm hover:bg-pine-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  className="w-full bg-rust hover:bg-rust-600 text-white font-semibold rounded-xl py-3.5 text-[15px] disabled:opacity-40 disabled:pointer-events-none transition-colors"
                 >
                   {loading
                     ? 'Memproses…'
@@ -786,6 +810,159 @@ export function PosClient({
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// ── CustomerSearchInput ───────────────────────────────────────────────────────
+
+interface CustomerResult { id: string; name: string; phone: string | null }
+
+function CustomerSearchInput({
+  name, phone, onNameChange, onPhoneChange, inputCls,
+}: {
+  name: string
+  phone: string
+  onNameChange: (v: string) => void
+  onPhoneChange: (v: string) => void
+  inputCls: string
+}) {
+  const [query,     setQuery]     = useState('')
+  const [results,   setResults]   = useState<CustomerResult[]>([])
+  const [open,      setOpen]      = useState(false)
+  const [searching, setSearching] = useState(false)
+  const [selected,  setSelected]  = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const timerRef     = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function onMouseDown(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onMouseDown)
+    return () => document.removeEventListener('mousedown', onMouseDown)
+  }, [])
+
+  const search = useCallback(async (q: string) => {
+    if (q.length < 2) { setResults([]); setOpen(false); return }
+    setSearching(true)
+    try {
+      const res  = await fetch(`/api/v1/customers?q=${encodeURIComponent(q)}&limit=8`)
+      const json = await res.json()
+      setResults(json.data ?? [])
+      setOpen(true)
+    } catch { /* ignore */ } finally {
+      setSearching(false)
+    }
+  }, [])
+
+  function handleQueryChange(val: string) {
+    setQuery(val)
+    setSelected(false)
+    // Also update name field directly so user can still submit free-form
+    onNameChange(val)
+    if (timerRef.current) clearTimeout(timerRef.current)
+    timerRef.current = setTimeout(() => search(val), 300)
+  }
+
+  function handleSelect(c: CustomerResult) {
+    onNameChange(c.name)
+    onPhoneChange(c.phone ?? '')
+    setQuery(c.name)
+    setSelected(true)
+    setOpen(false)
+    setResults([])
+  }
+
+  function handleClear() {
+    setQuery('')
+    onNameChange('')
+    onPhoneChange('')
+    setSelected(false)
+    setResults([])
+    setOpen(false)
+  }
+
+  // Sync query field if name was cleared externally (e.g. clearCart)
+  useEffect(() => {
+    if (!name) { setQuery(''); setSelected(false) }
+  }, [name])
+
+  return (
+    <div ref={containerRef} className="space-y-1.5">
+      {/* Search / name input */}
+      <div className="relative">
+        <input
+          className={`${inputCls} w-full pr-8`}
+          placeholder="Nama / No. HP pelanggan (opsional)"
+          value={query}
+          onChange={e => handleQueryChange(e.target.value)}
+          onFocus={() => { if (results.length > 0) setOpen(true) }}
+          autoComplete="off"
+        />
+        {/* Right icon: spinner, check, or clear */}
+        <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-400 pointer-events-none">
+          {searching
+            ? <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+              </svg>
+            : selected
+              ? <button type="button" onClick={handleClear} className="pointer-events-auto hover:text-danger">
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 16 16" stroke="currentColor" strokeWidth="2">
+                    <path d="M4 4l8 8M4 12l8-8" strokeLinecap="round"/>
+                  </svg>
+                </button>
+              : query
+                ? <button type="button" onClick={handleClear} className="pointer-events-auto hover:text-danger">
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 16 16" stroke="currentColor" strokeWidth="2">
+                      <path d="M4 4l8 8M4 12l8-8" strokeLinecap="round"/>
+                    </svg>
+                  </button>
+                : <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 20 20" stroke="currentColor" strokeWidth="2">
+                    <circle cx="9" cy="9" r="6"/><path d="M15 15l3 3" strokeLinecap="round"/>
+                  </svg>
+          }
+        </span>
+
+        {/* Dropdown */}
+        {open && results.length > 0 && (
+          <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-white border border-line rounded-lg shadow-lg overflow-hidden">
+            {results.map(c => (
+              <button
+                key={c.id}
+                type="button"
+                onMouseDown={e => { e.preventDefault(); handleSelect(c) }}
+                className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-sand-50 text-left transition-colors"
+              >
+                <span className="text-[13px] font-medium text-ink-900 truncate">{c.name}</span>
+                {c.phone && (
+                  <span className="text-xs text-ink-400 font-mono ml-2 shrink-0">{c.phone}</span>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* No results hint */}
+        {open && !searching && results.length === 0 && query.length >= 2 && (
+          <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-white border border-line rounded-lg shadow-lg px-3 py-2.5">
+            <p className="text-xs text-ink-400">Tidak ditemukan — akan dibuat sebagai pelanggan baru.</p>
+          </div>
+        )}
+      </div>
+
+      {/* Phone input — always visible for manual entry / override */}
+      <input
+        className={`${inputCls} w-full`}
+        placeholder="No. HP (opsional)"
+        type="tel"
+        value={phone}
+        onChange={e => onPhoneChange(e.target.value)}
+      />
     </div>
   )
 }
@@ -820,41 +997,77 @@ function CartPanel({
   updateQty, removeItem, onCheckout,
   inputCls,
 }: CartPanelProps) {
-  const isEmpty = cart.length === 0
+  const isEmpty    = cart.length === 0
+  const cartCount  = cart.reduce((s, i) => s + i.qty, 0)
 
   return (
     <div className="flex flex-col h-full">
+
+      {/* Cart header */}
+      <div className="bg-pine text-white px-4 py-3 flex items-center justify-between flex-shrink-0">
+        <span className="font-semibold text-sm tracking-wide">Pesanan</span>
+        {cartCount > 0 && (
+          <span className="bg-white/20 text-white text-xs font-bold rounded-full px-2 py-0.5 ml-2">
+            {cartCount}
+          </span>
+        )}
+      </div>
+
+      {/* Customer section — above items */}
+      {!isEmpty && (
+        <div className="px-3 pt-3 pb-2 border-b border-line flex-shrink-0">
+          <CustomerSearchInput
+            name={custName}
+            phone={custPhone}
+            onNameChange={setCustName}
+            onPhoneChange={setCustPhone}
+            inputCls={inputCls}
+          />
+        </div>
+      )}
+
       {/* Items list */}
-      <div className="flex-1 overflow-y-auto px-3 py-2 space-y-1">
+      <div className="flex-1 overflow-y-auto px-3 py-2 space-y-1.5">
         {isEmpty && (
           <div className="py-12 text-center text-ink-400 text-sm">
-            <p className="text-3xl mb-2">🛒</p>
+            <div className="flex justify-center mb-3">
+              <svg className="w-10 h-10 text-sand-300" width="40" height="40" viewBox="0 0 32 32" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                <rect x="10" y="14" width="12" height="14" rx="2"/>
+                <rect x="13" y="10" width="6" height="5" rx="1"/>
+                <rect x="12" y="8" width="8" height="3" rx="1"/>
+                <circle cx="16" cy="7" r="2"/>
+              </svg>
+            </div>
             <p>Keranjang kosong.</p>
             <p className="text-xs mt-1">Tap produk untuk menambahkan.</p>
           </div>
         )}
         {cart.map((item, idx) => (
-          <div key={idx} className="flex items-start gap-2 py-2 border-b border-line last:border-0">
+          <div key={idx} className="flex items-start gap-2 bg-sand-50 rounded-lg px-3 py-2.5">
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-ink-900 leading-snug">{item.product.name}</p>
+              <p className="text-[13px] font-medium text-ink-900 leading-snug">{item.product.name}</p>
               {item.is_custom && item.customization_notes && (
-                <p className="text-xs text-rust mt-0.5 italic truncate">{item.customization_notes}</p>
+                <p className="text-[11px] text-rust italic truncate mt-0.5">{item.customization_notes}</p>
               )}
-              <p className="text-xs text-ink-400 mt-0.5">{formatRp(item.unit_price)}</p>
+              <p className="text-[11px] text-ink-400 mt-0.5">{formatRp(item.unit_price)}</p>
             </div>
             <div className="flex items-center gap-1 flex-shrink-0">
-              <button onClick={() => updateQty(idx, -1)}
-                className="w-6 h-6 rounded-md bg-sand-100 text-ink-700 text-base font-medium hover:bg-sand-200 flex items-center justify-center leading-none">
+              <button
+                onClick={() => updateQty(idx, -1)}
+                className="w-6 h-6 rounded-md bg-white border border-line text-ink-700 font-semibold text-sm flex items-center justify-center leading-none"
+              >
                 −
               </button>
-              <span className="w-6 text-center text-sm font-medium tabular-nums">{item.qty}</span>
-              <button onClick={() => updateQty(idx, +1)}
-                className="w-6 h-6 rounded-md bg-sand-100 text-ink-700 text-base font-medium hover:bg-sand-200 flex items-center justify-center leading-none">
+              <span className="w-6 text-center text-sm font-semibold tabular-nums">{item.qty}</span>
+              <button
+                onClick={() => updateQty(idx, +1)}
+                className="w-6 h-6 rounded-md bg-white border border-line text-ink-700 font-semibold text-sm flex items-center justify-center leading-none"
+              >
                 +
               </button>
               <button onClick={() => removeItem(idx)} className="ml-1 text-ink-300 hover:text-danger">
-                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-                  <path d="M4 4l8 8M4 12L12 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <path d="M4 4l8 8M4 12l8-8"/>
                 </svg>
               </button>
             </div>
@@ -864,19 +1077,15 @@ function CartPanel({
 
       {/* Footer */}
       {!isEmpty && (
-        <div className="border-t border-line px-3 py-3 space-y-2.5 bg-white">
-          {/* Customer */}
-          <div className="grid grid-cols-2 gap-2">
-            <input className={`${inputCls} h-9 text-xs`} placeholder="Nama pelanggan"
-              value={custName} onChange={e => setCustName(e.target.value)} />
-            <input className={`${inputCls} h-9 text-xs`} placeholder="No. HP (opsional)"
-              type="tel" value={custPhone} onChange={e => setCustPhone(e.target.value)} />
-          </div>
+        <div className="border-t border-line px-3 pt-3 pb-4 bg-white flex-shrink-0 space-y-2">
 
           {/* Driver */}
           {drivers.length > 0 && (
-            <select className={`${inputCls} w-full h-9 text-xs`} value={driverId}
-              onChange={e => setDriverId(e.target.value)}>
+            <select
+              className="bg-sand-50 border border-line rounded-lg w-full px-3 py-2 text-[13px] text-ink-900 focus:outline-none focus:border-pine-400"
+              value={driverId}
+              onChange={e => setDriverId(e.target.value)}
+            >
               <option value="">— Tanpa driver —</option>
               {drivers.map(d => (
                 <option key={d.id} value={d.id}>{d.name} ({d.fee_value}%)</option>
@@ -886,42 +1095,47 @@ function CartPanel({
 
           {/* Discount */}
           <div className="flex items-center gap-2">
-            <label className="text-xs text-ink-500 whitespace-nowrap">Diskon (Rp)</label>
-            <input className={`${inputCls} flex-1 h-9 text-xs`} type="number" min={0}
-              value={discount || ''} placeholder="0"
-              onChange={e => setDiscount(Math.max(0, parseInt(e.target.value) || 0))} />
+            <label className="text-[12px] text-ink-500 whitespace-nowrap">Diskon (Rp)</label>
+            <input
+              className="bg-sand-50 border border-line rounded-lg px-3 py-2 text-[13px] text-ink-900 flex-1 focus:outline-none focus:border-pine-400 focus:ring-2 focus:ring-pine-100"
+              type="number"
+              min={0}
+              value={discount || ''}
+              placeholder="0"
+              onChange={e => setDiscount(Math.max(0, parseInt(e.target.value) || 0))}
+            />
           </div>
 
           {/* Totals */}
-          <div className="space-y-1 text-sm">
-            <div className="flex justify-between text-ink-500">
+          <div className="space-y-1">
+            <div className="flex justify-between text-[13px] text-ink-500">
               <span>Subtotal</span>
               <span className="tabular-nums">{formatRp(subtotal)}</span>
             </div>
             {discount > 0 && (
-              <div className="flex justify-between text-success">
+              <div className="flex justify-between text-[13px] text-success">
                 <span>Diskon</span>
                 <span className="tabular-nums">−{formatRp(discount)}</span>
               </div>
             )}
             {selectedDriver && (
-              <div className="flex justify-between text-ink-400 text-xs">
+              <div className="flex justify-between text-[12px] text-ink-400">
                 <span>Fee {selectedDriver.name} ({selectedDriver.fee_value}%)</span>
                 <span className="tabular-nums">{formatRp(Math.round(total * selectedDriver.fee_value / 100))}</span>
               </div>
             )}
-            <div className="flex justify-between font-semibold text-ink-900 pt-1 border-t border-line-strong">
-              <span>Total</span>
-              <span className="tabular-nums">{formatRp(total)}</span>
+            <div className="flex justify-between items-baseline pt-1.5 border-t border-line">
+              <span className="text-[13px] font-semibold text-ink-700 uppercase tracking-wider">Total</span>
+              <span className="text-[22px] font-bold text-ink-900 tabular-nums leading-none">{formatRp(total)}</span>
             </div>
           </div>
 
-          {/* Checkout → open payment modal */}
+          {/* Checkout CTA */}
           <button
             onClick={onCheckout}
-            className="w-full h-11 rounded-lg bg-pine text-white font-medium text-sm hover:bg-pine-700 transition-colors"
+            className="w-full bg-rust hover:bg-rust-600 text-white font-semibold text-[15px] rounded-xl py-3.5 mt-2 transition-colors active:scale-[0.98] disabled:opacity-40 disabled:pointer-events-none"
           >
-            Lanjut Bayar · {formatRp(total)}
+            Bayar · {formatRp(total)}
           </button>
         </div>
       )}

@@ -7,15 +7,18 @@ import { Modal } from '@/components/ui/Modal'
 import type { Tables } from '@/types/database'
 
 type Driver = Tables<'drivers'>
+type Agency = Pick<Tables<'travel_agencies'>, 'id' | 'name'>
+
 const EMPTY: Omit<Driver, 'id' | 'created_at'> = {
   name: '', phone: null, type: 'travel_driver',
-  fee_type: 'percentage', fee_value: 0,
+  fee_type: 'percentage', fee_value: 15,
+  travel_agency_id: null,
   referral_code: null, qr_token: null, active: true,
 }
 
 const TYPE_LABEL = { travel_driver: 'Travel Driver', tour_guide: 'Tour Guide' }
 
-export function DriversClient({ initialData }: { initialData: Driver[] }) {
+export function DriversClient({ initialData, agencies }: { initialData: Driver[]; agencies: Agency[] }) {
   const router = useRouter()
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing]     = useState<Driver | null>(null)
@@ -26,8 +29,11 @@ export function DriversClient({ initialData }: { initialData: Driver[] }) {
   function openCreate() { setEditing(null); setForm(EMPTY); setError(null); setModalOpen(true) }
   function openEdit(d: Driver) {
     setEditing(d)
-    setForm({ name: d.name, phone: d.phone, type: d.type, fee_type: d.fee_type,
-      fee_value: d.fee_value, referral_code: d.referral_code, qr_token: d.qr_token, active: d.active })
+    setForm({
+      name: d.name, phone: d.phone, type: d.type, fee_type: d.fee_type,
+      fee_value: d.fee_value, travel_agency_id: d.travel_agency_id,
+      referral_code: d.referral_code, qr_token: d.qr_token, active: d.active,
+    })
     setError(null); setModalOpen(true)
   }
 
@@ -36,8 +42,14 @@ export function DriversClient({ initialData }: { initialData: Driver[] }) {
     if (form.fee_value < 0 || form.fee_value > 100) { setError('Fee harus antara 0–100%.'); return }
     setSaving(true); setError(null)
     const supabase = createClient()
-    const payload = { ...form, phone: form.phone || null, referral_code: form.referral_code || null,
-      qr_token: form.qr_token || null, fee_value: Number(form.fee_value) }
+    const payload = {
+      ...form,
+      phone:            form.phone || null,
+      travel_agency_id: form.travel_agency_id || null,
+      referral_code:    form.referral_code || null,
+      qr_token:         form.qr_token || null,
+      fee_value:        Number(form.fee_value),
+    }
     const { error: err } = editing
       ? await supabase.from('drivers').update(payload).eq('id', editing.id)
       : await supabase.from('drivers').insert(payload)
@@ -52,6 +64,7 @@ export function DriversClient({ initialData }: { initialData: Driver[] }) {
     router.refresh()
   }
 
+  const agencyById = new Map(agencies.map(a => [a.id, a.name]))
   const inputCls = "h-10 rounded-md border border-line-strong px-3 text-sm text-ink-900 focus:outline-none focus:border-pine-400 focus:ring-2 focus:ring-pine-100"
 
   return (
@@ -69,6 +82,7 @@ export function DriversClient({ initialData }: { initialData: Driver[] }) {
             <tr className="bg-sand-100 text-xs uppercase tracking-wider text-ink-500 text-left">
               <th className="px-4 py-3 font-medium">Nama</th>
               <th className="px-4 py-3 font-medium hidden sm:table-cell">Tipe</th>
+              <th className="px-4 py-3 font-medium hidden md:table-cell">Perusahaan</th>
               <th className="px-4 py-3 font-medium text-right tabular-nums">Fee</th>
               <th className="px-4 py-3 font-medium hidden md:table-cell">Kode Referral</th>
               <th className="px-4 py-3 font-medium text-center">Status</th>
@@ -77,7 +91,7 @@ export function DriversClient({ initialData }: { initialData: Driver[] }) {
           </thead>
           <tbody className="divide-y divide-line">
             {initialData.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-10 text-center text-ink-400">Belum ada driver.</td></tr>
+              <tr><td colSpan={7} className="px-4 py-10 text-center text-ink-400">Belum ada driver.</td></tr>
             )}
             {initialData.map(d => (
               <tr key={d.id} className="hover:bg-sand-50 transition-colors">
@@ -89,6 +103,9 @@ export function DriversClient({ initialData }: { initialData: Driver[] }) {
                   <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-sand-100 text-ink-600 border border-line">
                     {TYPE_LABEL[d.type]}
                   </span>
+                </td>
+                <td className="px-4 py-3 text-ink-500 text-xs hidden md:table-cell">
+                  {d.travel_agency_id ? agencyById.get(d.travel_agency_id) ?? '—' : <span className="text-ink-300">Perorangan</span>}
                 </td>
                 <td className="px-4 py-3 text-right tabular-nums font-semibold text-ink-900">
                   {d.fee_value}%
@@ -127,12 +144,19 @@ export function DriversClient({ initialData }: { initialData: Driver[] }) {
                 <option value="tour_guide">Tour Guide</option>
               </select>
             )}
-            {field('Fee (%)',
+            {field('Fee Driver (%)',
               <input className={inputCls} type="number" min={0} max={100} step={0.5}
                 value={form.fee_value}
                 onChange={e => setForm(f => ({ ...f, fee_value: Number(e.target.value) }))} />
             )}
           </div>
+          {field('Perusahaan / Travel Agent',
+            <select className={inputCls} value={form.travel_agency_id ?? ''}
+              onChange={e => setForm(f => ({ ...f, travel_agency_id: e.target.value || null }))}>
+              <option value="">— Perorangan (tanpa perusahaan) —</option>
+              {agencies.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+            </select>
+          )}
           {field('Kode Referral', <input className={inputCls} value={form.referral_code ?? ''}
             onChange={e => setForm(f => ({ ...f, referral_code: e.target.value || null }))}
             placeholder="Opsional, mis. BUDI10" />)}

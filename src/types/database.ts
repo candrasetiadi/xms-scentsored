@@ -49,9 +49,27 @@ export type Database = {
         Relationships: []
       }
       drivers: {
-        Row: { id: string; name: string; phone: string | null; type: 'travel_driver' | 'tour_guide'; fee_type: 'percentage'; fee_value: number; referral_code: string | null; qr_token: string | null; active: boolean; created_at: string }
-        Insert: { id?: string; name: string; phone?: string | null; type: 'travel_driver' | 'tour_guide'; fee_type?: 'percentage'; fee_value?: number; referral_code?: string | null; qr_token?: string | null; active?: boolean; created_at?: string }
-        Update: { id?: string; name?: string; phone?: string | null; type?: 'travel_driver' | 'tour_guide'; fee_type?: 'percentage'; fee_value?: number; referral_code?: string | null; qr_token?: string | null; active?: boolean; created_at?: string }
+        Row: { id: string; name: string; phone: string | null; type: 'travel_driver' | 'tour_guide'; fee_type: 'percentage'; fee_value: number; travel_agency_id: string | null; referral_code: string | null; qr_token: string | null; active: boolean; created_at: string }
+        Insert: { id?: string; name: string; phone?: string | null; type: 'travel_driver' | 'tour_guide'; fee_type?: 'percentage'; fee_value?: number; travel_agency_id?: string | null; referral_code?: string | null; qr_token?: string | null; active?: boolean; created_at?: string }
+        Update: { id?: string; name?: string; phone?: string | null; type?: 'travel_driver' | 'tour_guide'; fee_type?: 'percentage'; fee_value?: number; travel_agency_id?: string | null; referral_code?: string | null; qr_token?: string | null; active?: boolean; created_at?: string }
+        Relationships: []
+      }
+      travel_agencies: {
+        Row: { id: string; name: string; phone: string | null; fee_value: number; active: boolean; created_at: string }
+        Insert: { id?: string; name: string; phone?: string | null; fee_value?: number; active?: boolean; created_at?: string }
+        Update: { id?: string; name?: string; phone?: string | null; fee_value?: number; active?: boolean; created_at?: string }
+        Relationships: []
+      }
+      agency_payouts: {
+        Row: { id: string; travel_agency_id: string; period_start: string | null; period_end: string | null; total: number; status: 'pending' | 'paid'; paid_at: string | null; created_at: string }
+        Insert: { id?: string; travel_agency_id: string; period_start?: string | null; period_end?: string | null; total?: number; status?: 'pending' | 'paid'; paid_at?: string | null; created_at?: string }
+        Update: { status?: 'pending' | 'paid'; paid_at?: string | null }
+        Relationships: []
+      }
+      agency_advance_fees: {
+        Row: { id: string; travel_agency_id: string; amount: number; note: string | null; created_by: string | null; created_at: string }
+        Insert: { id?: string; travel_agency_id: string; amount: number; note?: string | null; created_by?: string | null; created_at?: string }
+        Update: never
         Relationships: []
       }
       // ── M6 ────────────────────────────────────────────────────────────────
@@ -94,9 +112,9 @@ export type Database = {
         Relationships: []
       }
       driver_fees: {
-        Row: { id: string; driver_id: string; order_id: string; base_amount: number; fee_amount: number; fee_scheme_snapshot: Record<string, unknown> | null; status: 'accrued' | 'paid'; payout_id: string | null; accrued_at: string }
-        Insert: { id?: string; driver_id: string; order_id: string; base_amount: number; fee_amount: number; fee_scheme_snapshot?: Record<string, unknown> | null; status?: 'accrued' | 'paid'; payout_id?: string | null; accrued_at?: string }
-        Update: { status?: 'accrued' | 'paid'; payout_id?: string | null }
+        Row: { id: string; driver_id: string; order_id: string; base_amount: number; fee_amount: number; fee_scheme_snapshot: Record<string, unknown> | null; status: 'accrued' | 'paid'; payout_id: string | null; accrued_at: string; agency_id: string | null; agency_fee_amount: number | null; agency_fee_snapshot: Record<string, unknown> | null; agency_status: 'accrued' | 'paid' | null; agency_payout_id: string | null }
+        Insert: { id?: string; driver_id: string; order_id: string; base_amount: number; fee_amount: number; fee_scheme_snapshot?: Record<string, unknown> | null; status?: 'accrued' | 'paid'; payout_id?: string | null; accrued_at?: string; agency_id?: string | null; agency_fee_amount?: number | null; agency_fee_snapshot?: Record<string, unknown> | null; agency_status?: 'accrued' | 'paid' | null; agency_payout_id?: string | null }
+        Update: { status?: 'accrued' | 'paid'; payout_id?: string | null; agency_status?: 'accrued' | 'paid' | null; agency_payout_id?: string | null }
         Relationships: []
       }
       driver_payouts: {
@@ -325,6 +343,8 @@ export type Database = {
       receive_po_items:              { Args: { p_po_id: string; p_staff_id: string; p_items: Record<string, unknown>[] }; Returns: ReceivePoResult }
       // M7 Driver payout
       create_driver_payout:          { Args: { p_driver_id: string; p_period_start: string; p_period_end: string }; Returns: CreatePayoutResult }
+      // M10 Agency payout
+      create_agency_payout:          { Args: { p_travel_agency_id: string; p_period_start: string; p_period_end: string }; Returns: CreatePayoutResult }
       // M12 Reporting
       get_sales_report:              { Args: { p_branch_id: string; p_from: string; p_to: string }; Returns: SalesReport }
       get_driver_fee_report:         { Args: { p_from: string; p_to: string }; Returns: DriverFeeReportRow[] }

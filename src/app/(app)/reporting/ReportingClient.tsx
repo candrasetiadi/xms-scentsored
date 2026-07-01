@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import type {
   SalesReport, StockValuationRow, ProductionReport, DriverFeeReportRow,
 } from '@/types/database'
@@ -35,6 +35,43 @@ function exportCsv(rows: Record<string, unknown>[], filename: string) {
   a.href = URL.createObjectURL(blob)
   a.download = `${filename}_${today()}.csv`
   a.click()
+}
+
+function TableCard({
+  title, onExport, headers, footer, children,
+}: {
+  title: string
+  onExport?: () => void
+  headers: string[]
+  footer?: React.ReactNode
+  children: React.ReactNode
+}) {
+  return (
+    <div className="bg-white border border-line rounded-lg shadow-sm overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-line">
+        <p className="font-medium text-sm text-ink-900">{title}</p>
+        {onExport && (
+          <button onClick={onExport}
+            className="text-xs px-3 py-1.5 rounded-md border border-line text-ink-500 hover:text-ink-900 hover:border-line-strong transition-colors">
+            Export CSV
+          </button>
+        )}
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-sand-50">
+            <tr>
+              {headers.map(h => (
+                <th key={h} className="text-left px-4 py-2.5 text-xs font-medium text-ink-500 uppercase tracking-wide">{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>{children}</tbody>
+          {footer && <tfoot>{footer}</tfoot>}
+        </table>
+      </div>
+    </div>
+  )
 }
 
 interface Props {
@@ -99,166 +136,106 @@ export function ReportingClient({ defaultBranchId, branches }: Props) {
     antri: 'Antri', diracik: 'Diracik', packing: 'Packing',
     selesai: 'Selesai', diambil: 'Diambil',
   }
-  const STATUS_COLOR: Record<string, string> = {
-    antri: 'var(--color-text-secondary)', diracik: 'var(--color-warning)',
-    packing: 'var(--color-primary)', selesai: 'var(--color-success)', diambil: 'var(--color-text-secondary)',
-  }
-
   const needsBranch = tab !== 'driver-fees'
 
+  const ctrl = "h-9 rounded-md border border-line-strong bg-white px-3 text-sm text-ink-900 focus:outline-none focus:border-pine-400 focus:ring-2 focus:ring-pine-100"
+
   return (
-    <div className="min-h-screen" style={{ background: 'var(--color-surface)' }}>
-      <div className="max-w-5xl mx-auto px-4 py-6 space-y-4">
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <h1 className="text-xl font-semibold" style={{ color: 'var(--color-text-primary)' }}>Laporan</h1>
+    <div className="max-w-5xl mx-auto px-4 py-6 space-y-5">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <h1 className="text-xl font-semibold text-ink-900">Laporan</h1>
 
-          {/* Filters */}
-          <div className="flex items-center gap-2 flex-wrap">
-            {needsBranch && branches.length > 1 && (
-              <select value={branchId} onChange={e => setBranchId(e.target.value)}
-                className="rounded-lg px-3 py-1.5 text-sm border"
-                style={{ background: 'var(--color-surface-raised)', borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }}>
-                {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-              </select>
-            )}
-            {tab !== 'stock' && (
-              <>
-                <input type="date" value={from} onChange={e => setFrom(e.target.value)}
-                  className="rounded-lg px-2 py-1.5 text-sm border"
-                  style={{ background: 'var(--color-surface-raised)', borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }} />
-                <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>–</span>
-                <input type="date" value={to} onChange={e => setTo(e.target.value)}
-                  className="rounded-lg px-2 py-1.5 text-sm border"
-                  style={{ background: 'var(--color-surface-raised)', borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }} />
-              </>
-            )}
-            <button onClick={load} disabled={loading}
-              className="rounded-lg px-3 py-1.5 text-sm font-medium"
-              style={{ background: 'var(--color-primary)', color: '#fff', opacity: loading ? 0.6 : 1 }}>
-              {loading ? 'Memuat...' : 'Tampilkan'}
-            </button>
-          </div>
+        {/* Filters */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {needsBranch && branches.length > 1 && (
+            <select value={branchId} onChange={e => setBranchId(e.target.value)} className={ctrl}>
+              {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </select>
+          )}
+          {tab !== 'stock' && (
+            <>
+              <input type="date" value={from} onChange={e => setFrom(e.target.value)} className={ctrl} />
+              <span className="text-ink-400 text-sm select-none">—</span>
+              <input type="date" value={to} onChange={e => setTo(e.target.value)} className={ctrl} />
+            </>
+          )}
+          <button onClick={load} disabled={loading}
+            className="h-9 px-4 rounded-md bg-pine text-white text-sm font-medium hover:bg-pine-700 disabled:opacity-50 transition-colors">
+            {loading ? 'Memuat…' : 'Tampilkan'}
+          </button>
         </div>
+      </div>
 
-        {/* Tabs */}
-        <div className="flex gap-1 rounded-xl p-1" style={{ background: 'var(--color-surface-raised)' }}>
-          {TABS.map(t => (
-            <button key={t.id} onClick={() => setTab(t.id)}
-              className="flex-1 py-2 rounded-lg text-sm font-medium transition-all"
-              style={{
-                background: tab === t.id ? 'var(--color-surface)' : 'transparent',
-                color: tab === t.id ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-                boxShadow: tab === t.id ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-              }}>
-              {t.label}
-            </button>
-          ))}
-        </div>
+      {/* Tabs */}
+      <div className="flex gap-1 bg-sand-100 rounded-xl p-1">
+        {TABS.map(t => (
+          <button key={t.id} onClick={() => setTab(t.id)}
+            className={[
+              'flex-1 py-2 rounded-lg text-sm font-medium transition-all',
+              tab === t.id
+                ? 'bg-white text-ink-900 shadow-sm'
+                : 'text-ink-500 hover:text-ink-700',
+            ].join(' ')}>
+            {t.label}
+          </button>
+        ))}
+      </div>
 
-        {error && (
-          <p className="rounded-xl px-4 py-3 text-sm"
-            style={{ background: 'var(--color-error-bg)', color: 'var(--color-error)' }}>{error}</p>
-        )}
+      {error && (
+        <p className="rounded-lg px-4 py-3 text-sm bg-danger-bg text-danger border border-danger-bd">{error}</p>
+      )}
 
-        {/* ── Sales ─────────────────────────────────────────────────────────── */}
+        {/* ── Sales ──────────────────────────────────────────────────────────── */}
         {tab === 'sales' && sales && (
           <div className="space-y-4">
-            {/* Summary cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {[
-                { label: 'Revenue', value: fmt(sales.totals.total_revenue) },
-                { label: 'Total Order', value: fmtNum(sales.totals.total_orders) },
-                { label: 'Avg/Order', value: fmt(sales.totals.avg_order_value) },
-                { label: 'Total Diskon', value: fmt(sales.totals.total_discount) },
+                { label: 'Revenue',       value: fmt(sales.totals.total_revenue) },
+                { label: 'Total Order',   value: fmtNum(sales.totals.total_orders) },
+                { label: 'Rata-rata/Order', value: fmt(sales.totals.avg_order_value) },
+                { label: 'Total Diskon',  value: fmt(sales.totals.total_discount) },
               ].map(card => (
-                <div key={card.label} className="rounded-xl p-4 border"
-                  style={{ background: 'var(--color-surface-raised)', borderColor: 'var(--color-border)' }}>
-                  <p className="text-xs mb-1" style={{ color: 'var(--color-text-secondary)' }}>{card.label}</p>
-                  <p className="font-bold text-base" style={{ color: 'var(--color-text-primary)' }}>{card.value}</p>
+                <div key={card.label} className="bg-white border border-line rounded-lg p-4 shadow-sm">
+                  <p className="text-xs text-ink-500 mb-1">{card.label}</p>
+                  <p className="font-bold text-base text-ink-900">{card.value}</p>
                 </div>
               ))}
             </div>
 
-            {/* Daily table */}
-            {sales.daily.length > 0 && (
-              <div className="rounded-xl border overflow-hidden"
-                style={{ background: 'var(--color-surface-raised)', borderColor: 'var(--color-border)' }}>
-                <div className="flex items-center justify-between px-4 py-3 border-b"
-                  style={{ borderColor: 'var(--color-border)' }}>
-                  <p className="font-medium text-sm" style={{ color: 'var(--color-text-primary)' }}>Penjualan Harian</p>
-                  <button onClick={() => exportCsv(sales.daily as unknown as Record<string, unknown>[], 'penjualan_harian')}
-                    className="text-xs px-3 py-1 rounded-lg border"
-                    style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}>
-                    Export CSV
-                  </button>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
-                        {['Tanggal', 'Order', 'Revenue', 'Diskon', 'Avg/Order'].map(h => (
-                          <th key={h} className="text-left px-4 py-2 text-xs font-medium"
-                            style={{ color: 'var(--color-text-secondary)' }}>{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {sales.daily.map(row => (
-                        <tr key={row.day} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                          <td className="px-4 py-2" style={{ color: 'var(--color-text-primary)' }}>{fmtDate(row.day)}</td>
-                          <td className="px-4 py-2" style={{ color: 'var(--color-text-primary)' }}>{row.order_count}</td>
-                          <td className="px-4 py-2 font-medium" style={{ color: 'var(--color-text-primary)' }}>{fmt(row.revenue)}</td>
-                          <td className="px-4 py-2" style={{ color: 'var(--color-text-secondary)' }}>{fmt(row.total_discount)}</td>
-                          <td className="px-4 py-2" style={{ color: 'var(--color-text-secondary)' }}>{fmt(row.avg_order_value)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
+            {sales.daily.length > 0 && <TableCard
+              title="Penjualan Harian"
+              onExport={() => exportCsv(sales.daily as unknown as Record<string, unknown>[], 'penjualan_harian')}
+              headers={['Tanggal', 'Order', 'Revenue', 'Diskon', 'Avg/Order']}
+            >
+              {sales.daily.map(row => (
+                <tr key={row.day} className="border-b border-line last:border-0 hover:bg-sand-50">
+                  <td className="px-4 py-2.5 text-ink-700">{fmtDate(row.day)}</td>
+                  <td className="px-4 py-2.5 text-ink-900 tabular-nums">{row.order_count}</td>
+                  <td className="px-4 py-2.5 font-medium text-ink-900 tabular-nums">{fmt(row.revenue)}</td>
+                  <td className="px-4 py-2.5 text-ink-500 tabular-nums">{fmt(row.total_discount)}</td>
+                  <td className="px-4 py-2.5 text-ink-500 tabular-nums">{fmt(row.avg_order_value)}</td>
+                </tr>
+              ))}
+            </TableCard>}
 
-            {/* Top products */}
-            {sales.top_products.length > 0 && (
-              <div className="rounded-xl border overflow-hidden"
-                style={{ background: 'var(--color-surface-raised)', borderColor: 'var(--color-border)' }}>
-                <div className="flex items-center justify-between px-4 py-3 border-b"
-                  style={{ borderColor: 'var(--color-border)' }}>
-                  <p className="font-medium text-sm" style={{ color: 'var(--color-text-primary)' }}>Top 10 Produk</p>
-                  <button onClick={() => exportCsv(sales.top_products as unknown as Record<string, unknown>[], 'top_produk')}
-                    className="text-xs px-3 py-1 rounded-lg border"
-                    style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}>
-                    Export CSV
-                  </button>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
-                        {['#', 'Produk', 'Kategori', 'Unit Terjual', 'Revenue'].map(h => (
-                          <th key={h} className="text-left px-4 py-2 text-xs font-medium"
-                            style={{ color: 'var(--color-text-secondary)' }}>{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {sales.top_products.map((row, i) => (
-                        <tr key={row.product_name} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                          <td className="px-4 py-2 text-xs" style={{ color: 'var(--color-text-secondary)' }}>{i + 1}</td>
-                          <td className="px-4 py-2 font-medium" style={{ color: 'var(--color-text-primary)' }}>{row.product_name}</td>
-                          <td className="px-4 py-2 text-xs" style={{ color: 'var(--color-text-secondary)' }}>{row.category ?? '—'}</td>
-                          <td className="px-4 py-2" style={{ color: 'var(--color-text-primary)' }}>{fmtNum(row.units_sold)}</td>
-                          <td className="px-4 py-2 font-medium" style={{ color: 'var(--color-text-primary)' }}>{fmt(row.revenue)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
+            {sales.top_products.length > 0 && <TableCard
+              title="Top 10 Produk"
+              onExport={() => exportCsv(sales.top_products as unknown as Record<string, unknown>[], 'top_produk')}
+              headers={['#', 'Produk', 'Kategori', 'Unit Terjual', 'Revenue']}
+            >
+              {sales.top_products.map((row, i) => (
+                <tr key={row.product_name} className="border-b border-line last:border-0 hover:bg-sand-50">
+                  <td className="px-4 py-2.5 text-xs text-ink-400 tabular-nums">{i + 1}</td>
+                  <td className="px-4 py-2.5 font-medium text-ink-900">{row.product_name}</td>
+                  <td className="px-4 py-2.5 text-xs text-ink-500">{row.category ?? '—'}</td>
+                  <td className="px-4 py-2.5 text-ink-900 tabular-nums">{fmtNum(row.units_sold)}</td>
+                  <td className="px-4 py-2.5 font-medium text-ink-900 tabular-nums">{fmt(row.revenue)}</td>
+                </tr>
+              ))}
+            </TableCard>}
 
             {sales.daily.length === 0 && (
-              <p className="text-center py-8 text-sm" style={{ color: 'var(--color-text-secondary)' }}>Tidak ada data penjualan dalam periode ini.</p>
+              <p className="text-center py-10 text-sm text-ink-400">Tidak ada data penjualan dalam periode ini.</p>
             )}
           </div>
         )}
@@ -266,104 +243,74 @@ export function ReportingClient({ defaultBranchId, branches }: Props) {
         {/* ── Stock Valuation ───────────────────────────────────────────────── */}
         {tab === 'stock' && (
           <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div className="rounded-xl p-4 border"
-                style={{ background: 'var(--color-surface-raised)', borderColor: 'var(--color-border)' }}>
-                <p className="text-xs mb-1" style={{ color: 'var(--color-text-secondary)' }}>Total Valuasi Stok</p>
-                <p className="font-bold text-lg" style={{ color: 'var(--color-text-primary)' }}>{fmt(stockTotal)}</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-white border border-line rounded-lg p-4 shadow-sm">
+                <p className="text-xs text-ink-500 mb-1">Total Valuasi Stok</p>
+                <p className="font-bold text-lg text-ink-900">{fmt(stockTotal)}</p>
               </div>
-              <div className="rounded-xl p-4 border"
-                style={{ background: 'var(--color-surface-raised)', borderColor: 'var(--color-border)' }}>
-                <p className="text-xs mb-1" style={{ color: 'var(--color-text-secondary)' }}>Jumlah Material</p>
-                <p className="font-bold text-lg" style={{ color: 'var(--color-text-primary)' }}>{fmtNum(stock.length)}</p>
+              <div className="bg-white border border-line rounded-lg p-4 shadow-sm">
+                <p className="text-xs text-ink-500 mb-1">Jumlah Material</p>
+                <p className="font-bold text-lg text-ink-900">{fmtNum(stock.length)}</p>
               </div>
             </div>
 
-            {stock.length > 0 ? (
-              <div className="rounded-xl border overflow-hidden"
-                style={{ background: 'var(--color-surface-raised)', borderColor: 'var(--color-border)' }}>
-                <div className="flex items-center justify-between px-4 py-3 border-b"
-                  style={{ borderColor: 'var(--color-border)' }}>
-                  <p className="font-medium text-sm" style={{ color: 'var(--color-text-primary)' }}>Valuasi per Bahan Baku (FIFO)</p>
-                  <button onClick={() => exportCsv(stock as unknown as Record<string, unknown>[], 'valuasi_stok')}
-                    className="text-xs px-3 py-1 rounded-lg border"
-                    style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}>
-                    Export CSV
-                  </button>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
-                        {['Bahan Baku', 'Stok', 'Satuan', 'Nilai FIFO'].map(h => (
-                          <th key={h} className="text-left px-4 py-2 text-xs font-medium"
-                            style={{ color: 'var(--color-text-secondary)' }}>{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {stock.map(row => (
-                        <tr key={row.raw_material_id} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                          <td className="px-4 py-2 font-medium" style={{ color: 'var(--color-text-primary)' }}>{row.name}</td>
-                          <td className="px-4 py-2" style={{ color: 'var(--color-text-primary)' }}>{fmtNum(row.total_qty)}</td>
-                          <td className="px-4 py-2 text-xs" style={{ color: 'var(--color-text-secondary)' }}>{row.unit}</td>
-                          <td className="px-4 py-2 font-medium" style={{ color: 'var(--color-text-primary)' }}>{fmt(row.total_value)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            ) : (
-              <p className="text-center py-8 text-sm" style={{ color: 'var(--color-text-secondary)' }}>Tidak ada stok tercatat.</p>
-            )}
+            {stock.length > 0
+              ? <TableCard
+                  title="Valuasi per Bahan Baku (FIFO)"
+                  onExport={() => exportCsv(stock as unknown as Record<string, unknown>[], 'valuasi_stok')}
+                  headers={['Bahan Baku', 'Stok', 'Satuan', 'Nilai FIFO']}
+                >
+                  {stock.map(row => (
+                    <tr key={row.raw_material_id} className="border-b border-line last:border-0 hover:bg-sand-50">
+                      <td className="px-4 py-2.5 font-medium text-ink-900">{row.name}</td>
+                      <td className="px-4 py-2.5 text-ink-900 tabular-nums">{fmtNum(row.total_qty)}</td>
+                      <td className="px-4 py-2.5 text-xs text-ink-500">{row.unit}</td>
+                      <td className="px-4 py-2.5 font-medium text-ink-900 tabular-nums">{fmt(row.total_value)}</td>
+                    </tr>
+                  ))}
+                </TableCard>
+              : <p className="text-center py-10 text-sm text-ink-400">Tidak ada stok tercatat.</p>
+            }
           </div>
         )}
 
         {/* ── Production ────────────────────────────────────────────────────── */}
         {tab === 'production' && production && (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              <div className="rounded-xl p-4 border"
-                style={{ background: 'var(--color-surface-raised)', borderColor: 'var(--color-border)' }}>
-                <p className="text-xs mb-1" style={{ color: 'var(--color-text-secondary)' }}>Avg Lead Time</p>
-                <p className="font-bold text-lg" style={{ color: 'var(--color-text-primary)' }}>
-                  {production.avg_lead_time_minutes} menit
-                </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-white border border-line rounded-lg p-4 shadow-sm">
+                <p className="text-xs text-ink-500 mb-1">Avg Lead Time</p>
+                <p className="font-bold text-lg text-ink-900">{production.avg_lead_time_minutes} menit</p>
               </div>
-              <div className="rounded-xl p-4 border"
-                style={{ background: 'var(--color-surface-raised)', borderColor: 'var(--color-border)' }}>
-                <p className="text-xs mb-1" style={{ color: 'var(--color-text-secondary)' }}>Total Order Produksi</p>
-                <p className="font-bold text-lg" style={{ color: 'var(--color-text-primary)' }}>
+              <div className="bg-white border border-line rounded-lg p-4 shadow-sm">
+                <p className="text-xs text-ink-500 mb-1">Total Order Produksi</p>
+                <p className="font-bold text-lg text-ink-900">
                   {fmtNum(production.by_status.reduce((s, r) => s + r.cnt, 0))}
                 </p>
               </div>
             </div>
 
-            <div className="rounded-xl border overflow-hidden"
-              style={{ background: 'var(--color-surface-raised)', borderColor: 'var(--color-border)' }}>
-              <p className="px-4 py-3 font-medium text-sm border-b"
-                style={{ color: 'var(--color-text-primary)', borderColor: 'var(--color-border)' }}>
-                Distribusi Status
-              </p>
-              <div className="p-4 space-y-2">
-                {production.by_status.length === 0 ? (
-                  <p className="text-sm text-center py-2" style={{ color: 'var(--color-text-secondary)' }}>Tidak ada data.</p>
-                ) : production.by_status.map(row => {
-                  const total = production.by_status.reduce((s, r) => s + r.cnt, 0)
-                  const pct = total > 0 ? Math.round((row.cnt / total) * 100) : 0
-                  return (
-                    <div key={row.status} className="flex items-center gap-3">
-                      <span className="w-20 text-sm font-medium" style={{ color: STATUS_COLOR[row.status] ?? 'var(--color-text-primary)' }}>
-                        {STATUS_LABEL[row.status] ?? row.status}
-                      </span>
-                      <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: 'var(--color-border)' }}>
-                        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: STATUS_COLOR[row.status] ?? 'var(--color-primary)' }} />
-                      </div>
-                      <span className="text-sm w-12 text-right" style={{ color: 'var(--color-text-secondary)' }}>{row.cnt}</span>
-                    </div>
-                  )
-                })}
+            <div className="bg-white border border-line rounded-lg shadow-sm overflow-hidden">
+              <p className="px-4 py-3 font-medium text-sm text-ink-900 border-b border-line">Distribusi Status</p>
+              <div className="p-4 space-y-3">
+                {production.by_status.length === 0
+                  ? <p className="text-sm text-center py-2 text-ink-400">Tidak ada data.</p>
+                  : production.by_status.map(row => {
+                      const total = production.by_status.reduce((s, r) => s + r.cnt, 0)
+                      const pct   = total > 0 ? Math.round((row.cnt / total) * 100) : 0
+                      return (
+                        <div key={row.status} className="flex items-center gap-3">
+                          <span className="w-20 text-sm font-medium text-ink-700">
+                            {STATUS_LABEL[row.status] ?? row.status}
+                          </span>
+                          <div className="flex-1 h-1.5 bg-sand-200 rounded-full overflow-hidden">
+                            <div className="h-full bg-pine rounded-full" style={{ width: `${pct}%` }} />
+                          </div>
+                          <span className="text-sm text-ink-500 w-10 text-right tabular-nums">{row.cnt}</span>
+                        </div>
+                      )
+                    })
+                }
               </div>
             </div>
           </div>
@@ -371,73 +318,42 @@ export function ReportingClient({ defaultBranchId, branches }: Props) {
 
         {/* ── Driver Fees ───────────────────────────────────────────────────── */}
         {tab === 'driver-fees' && (
-          <div className="space-y-4">
-            {driverFees.length === 0 ? (
-              <p className="text-center py-8 text-sm" style={{ color: 'var(--color-text-secondary)' }}>Tidak ada fee driver dalam periode ini.</p>
-            ) : (
-              <div className="rounded-xl border overflow-hidden"
-                style={{ background: 'var(--color-surface-raised)', borderColor: 'var(--color-border)' }}>
-                <div className="flex items-center justify-between px-4 py-3 border-b"
-                  style={{ borderColor: 'var(--color-border)' }}>
-                  <p className="font-medium text-sm" style={{ color: 'var(--color-text-primary)' }}>Rekapitulasi Fee Driver</p>
-                  <button onClick={() => exportCsv(driverFees as unknown as Record<string, unknown>[], 'fee_driver')}
-                    className="text-xs px-3 py-1 rounded-lg border"
-                    style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}>
-                    Export CSV
-                  </button>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
-                        {['Driver', 'Tipe', 'Fee %', 'Order', 'Total Fee', 'Accrued', 'Dibayar'].map(h => (
-                          <th key={h} className="text-left px-4 py-2 text-xs font-medium"
-                            style={{ color: 'var(--color-text-secondary)' }}>{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {driverFees.map(row => (
-                        <tr key={row.driver_id} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                          <td className="px-4 py-2 font-medium" style={{ color: 'var(--color-text-primary)' }}>{row.driver_name}</td>
-                          <td className="px-4 py-2 text-xs" style={{ color: 'var(--color-text-secondary)' }}>
-                            {row.driver_type === 'travel_driver' ? 'Driver' : 'Tour Guide'}
-                          </td>
-                          <td className="px-4 py-2" style={{ color: 'var(--color-text-primary)' }}>{row.fee_value}%</td>
-                          <td className="px-4 py-2" style={{ color: 'var(--color-text-primary)' }}>{row.order_count}</td>
-                          <td className="px-4 py-2 font-medium" style={{ color: 'var(--color-text-primary)' }}>{fmt(row.total_fee)}</td>
-                          <td className="px-4 py-2" style={{ color: row.total_accrued > 0 ? 'var(--color-warning)' : 'var(--color-text-secondary)' }}>
-                            {fmt(row.total_accrued)}
-                          </td>
-                          <td className="px-4 py-2" style={{ color: 'var(--color-success)' }}>{fmt(row.total_paid)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                    <tfoot style={{ borderTop: '2px solid var(--color-border)' }}>
-                      <tr>
-                        <td colSpan={4} className="px-4 py-2 text-xs font-semibold" style={{ color: 'var(--color-text-secondary)' }}>TOTAL</td>
-                        <td className="px-4 py-2 font-bold" style={{ color: 'var(--color-text-primary)' }}>
-                          {fmt(driverFees.reduce((s, r) => s + r.total_fee, 0))}
-                        </td>
-                        <td className="px-4 py-2 font-bold" style={{ color: 'var(--color-warning)' }}>
-                          {fmt(driverFees.reduce((s, r) => s + r.total_accrued, 0))}
-                        </td>
-                        <td className="px-4 py-2 font-bold" style={{ color: 'var(--color-success)' }}>
-                          {fmt(driverFees.reduce((s, r) => s + r.total_paid, 0))}
-                        </td>
-                      </tr>
-                    </tfoot>
-                  </table>
-                </div>
-              </div>
-            )}
-          </div>
+          driverFees.length === 0
+            ? <p className="text-center py-10 text-sm text-ink-400">Tidak ada fee driver dalam periode ini.</p>
+            : <TableCard
+                title="Rekapitulasi Fee Driver"
+                onExport={() => exportCsv(driverFees as unknown as Record<string, unknown>[], 'fee_driver')}
+                headers={['Driver', 'Tipe', 'Fee %', 'Order', 'Total Fee', 'Pending', 'Dibayar']}
+                footer={
+                  <tr className="border-t-2 border-line bg-sand-50">
+                    <td colSpan={4} className="px-4 py-2.5 text-xs font-semibold text-ink-500 uppercase tracking-wider">Total</td>
+                    <td className="px-4 py-2.5 font-bold text-ink-900 tabular-nums">{fmt(driverFees.reduce((s, r) => s + r.total_fee, 0))}</td>
+                    <td className="px-4 py-2.5 font-bold text-warning tabular-nums">{fmt(driverFees.reduce((s, r) => s + r.total_accrued, 0))}</td>
+                    <td className="px-4 py-2.5 font-bold text-success tabular-nums">{fmt(driverFees.reduce((s, r) => s + r.total_paid, 0))}</td>
+                  </tr>
+                }
+              >
+                {driverFees.map(row => (
+                  <tr key={row.driver_id} className="border-b border-line last:border-0 hover:bg-sand-50">
+                    <td className="px-4 py-2.5 font-medium text-ink-900">{row.driver_name}</td>
+                    <td className="px-4 py-2.5 text-xs text-ink-500">{row.driver_type === 'travel_driver' ? 'Driver' : 'Tour Guide'}</td>
+                    <td className="px-4 py-2.5 text-ink-700 tabular-nums">{row.fee_value}%</td>
+                    <td className="px-4 py-2.5 text-ink-700 tabular-nums">{row.order_count}</td>
+                    <td className="px-4 py-2.5 font-medium text-ink-900 tabular-nums">{fmt(row.total_fee)}</td>
+                    <td className={`px-4 py-2.5 tabular-nums font-medium ${row.total_accrued > 0 ? 'text-warning' : 'text-ink-400'}`}>
+                      {fmt(row.total_accrued)}
+                    </td>
+                    <td className="px-4 py-2.5 text-success tabular-nums font-medium">{fmt(row.total_paid)}</td>
+                  </tr>
+                ))}
+              </TableCard>
         )}
 
         {loading && !error && (
-          <p className="text-center py-8 text-sm" style={{ color: 'var(--color-text-secondary)' }}>Memuat data...</p>
+          <div className="space-y-3">
+            {[1,2,3,4].map(i => <div key={i} className="h-12 bg-sand-100 rounded-lg animate-pulse" />)}
+          </div>
         )}
-      </div>
     </div>
   )
 }
