@@ -15,32 +15,34 @@ export async function GET(request: Request) {
     .from('staff').select('id, role, branch_id').eq('auth_user_id', user.id).eq('active', true).single()
   if (!staff) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const isManager = ['owner', 'admin'].includes(staff.role)
   const { searchParams } = new URL(request.url)
-  const branchId = searchParams.get('branch_id') ?? staff.branch_id
+  const branchParam = searchParams.get('branch_id') ?? staff.branch_id
   const from = searchParams.get('from')
   const to = searchParams.get('to')
   const staffIdParam = searchParams.get('staff_id')
 
-  if (!branchId || !UUID_RE.test(branchId))
+  // Non-manager must have a branch resolved from session
+  if (!isManager && (!branchParam || !UUID_RE.test(branchParam)))
     return NextResponse.json({ error: 'branch_id wajib dan harus UUID valid.' }, { status: 400 })
+  if (isManager && branchParam && !UUID_RE.test(branchParam))
+    return NextResponse.json({ error: 'branch_id harus UUID valid.' }, { status: 400 })
   if (from && !DATE_RE.test(from)) return NextResponse.json({ error: 'from harus format YYYY-MM-DD.' }, { status: 400 })
   if (to && !DATE_RE.test(to)) return NextResponse.json({ error: 'to harus format YYYY-MM-DD.' }, { status: 400 })
   if (staffIdParam && !UUID_RE.test(staffIdParam))
     return NextResponse.json({ error: 'staff_id harus UUID valid.' }, { status: 400 })
 
-  const isManager = ['owner', 'admin'].includes(staff.role)
-
   let query = supabase
     .from('attendances')
     .select('*, staff:staff_id (id, name, role)')
-    .eq('branch_id', branchId)
     .order('work_date', { ascending: false })
 
   if (!isManager) {
-    // Non-manager: always restrict to self
     query = query.eq('staff_id', staff.id)
-  } else if (staffIdParam) {
-    query = query.eq('staff_id', staffIdParam)
+    if (branchParam) query = query.eq('branch_id', branchParam)
+  } else {
+    if (branchParam) query = query.eq('branch_id', branchParam)
+    if (staffIdParam) query = query.eq('staff_id', staffIdParam)
   }
 
   if (from) query = query.gte('work_date', from)

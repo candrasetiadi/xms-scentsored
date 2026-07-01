@@ -15,17 +15,18 @@ export async function GET(request: Request) {
     .from('staff').select('id, role, branch_id').eq('auth_user_id', user.id).eq('active', true).single()
   if (!staff) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const isManager = ['owner', 'admin'].includes(staff.role)
   const { searchParams } = new URL(request.url)
-  const branchId = searchParams.get('branch_id') ?? staff.branch_id
+  const branchParam = searchParams.get('branch_id') ?? staff.branch_id
   const from = searchParams.get('from')
   const to = searchParams.get('to')
 
-  if (!branchId || !UUID_RE.test(branchId))
+  if (!isManager && (!branchParam || !UUID_RE.test(branchParam)))
     return NextResponse.json({ error: 'branch_id wajib dan harus UUID valid.' }, { status: 400 })
+  if (isManager && branchParam && !UUID_RE.test(branchParam))
+    return NextResponse.json({ error: 'branch_id harus UUID valid.' }, { status: 400 })
   if (!from || !DATE_RE.test(from)) return NextResponse.json({ error: 'from wajib (format YYYY-MM-DD).' }, { status: 400 })
   if (!to || !DATE_RE.test(to)) return NextResponse.json({ error: 'to wajib (format YYYY-MM-DD).' }, { status: 400 })
-
-  const isManager = ['owner', 'admin'].includes(staff.role)
 
   let query = supabase
     .from('staff_schedules')
@@ -34,13 +35,15 @@ export async function GET(request: Request) {
       staff:staff_id (id, name, role),
       shift:shift_id (id, name, start_time, end_time, break_minutes)
     `)
-    .eq('branch_id', branchId)
     .gte('work_date', from)
     .lte('work_date', to)
     .order('work_date')
 
   if (!isManager) {
     query = query.eq('staff_id', staff.id)
+    if (branchParam) query = query.eq('branch_id', branchParam)
+  } else {
+    if (branchParam) query = query.eq('branch_id', branchParam)
   }
 
   const { data, error } = await query
