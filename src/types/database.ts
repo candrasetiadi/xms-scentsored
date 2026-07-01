@@ -312,6 +312,73 @@ export type Database = {
           { foreignKeyName: 'notification_reads_staff_id_fkey';        columns: ['staff_id'];        referencedRelation: 'staff';         referencedColumns: ['id'] },
         ]
       }
+      // ── M13 HRIS/SDM ───────────────────────────────────────────────────────
+      hr_settings: {
+        Row: { id: string; branch_id: string; late_tolerance_minutes: number; overtime_rate_per_hour: number; created_at: string; updated_at: string }
+        Insert: { id?: string; branch_id: string; late_tolerance_minutes?: number; overtime_rate_per_hour?: number; created_at?: string; updated_at?: string }
+        Update: { late_tolerance_minutes?: number; overtime_rate_per_hour?: number; updated_at?: string }
+        Relationships: []
+      }
+      shifts: {
+        Row: { id: string; branch_id: string | null; name: string; start_time: string; end_time: string; break_minutes: number; active: boolean; created_at: string }
+        Insert: { id?: string; branch_id?: string | null; name: string; start_time: string; end_time: string; break_minutes?: number; active?: boolean; created_at?: string }
+        Update: { name?: string; start_time?: string; end_time?: string; break_minutes?: number; active?: boolean }
+        Relationships: []
+      }
+      staff_schedules: {
+        Row: { id: string; staff_id: string; shift_id: string; branch_id: string; work_date: string; created_at: string }
+        Insert: { id?: string; staff_id: string; shift_id: string; branch_id: string; work_date: string; created_at?: string }
+        Update: { shift_id?: string }
+        Relationships: []
+      }
+      attendances: {
+        Row: { id: string; staff_id: string; branch_id: string; work_date: string; clock_in: string | null; clock_out: string | null; worked_minutes: number | null; status: string; note: string | null; created_at: string }
+        Insert: { id?: string; staff_id: string; branch_id: string; work_date: string; clock_in?: string | null; clock_out?: string | null; worked_minutes?: number | null; status?: string; note?: string | null; created_at?: string }
+        Update: { clock_in?: string | null; clock_out?: string | null; worked_minutes?: number | null; status?: string; note?: string | null }
+        Relationships: []
+      }
+      attendance_corrections: {
+        Row: { id: string; staff_id: string; work_date: string; requested_clock_in: string | null; requested_clock_out: string | null; reason: string; status: string; approved_by: string | null; approved_at: string | null; created_at: string }
+        Insert: { id?: string; staff_id: string; work_date: string; requested_clock_in?: string | null; requested_clock_out?: string | null; reason: string; status?: string; approved_by?: string | null; approved_at?: string | null; created_at?: string }
+        Update: { status?: string; reason?: string; approved_by?: string | null; approved_at?: string | null }
+        Relationships: []
+      }
+      overtime_requests: {
+        Row: { id: string; staff_id: string; work_date: string; hours: number; reason: string; status: string; approved_by: string | null; approved_at: string | null; overtime_amount: number | null; created_at: string }
+        Insert: { id?: string; staff_id: string; work_date: string; hours: number; reason: string; status?: string; approved_by?: string | null; approved_at?: string | null; overtime_amount?: number | null; created_at?: string }
+        Update: { status?: string; approved_by?: string | null; approved_at?: string | null; overtime_amount?: number | null }
+        Relationships: []
+      }
+      leave_requests: {
+        Row: { id: string; staff_id: string; type: string; start_date: string; end_date: string; days: number; reason: string; status: string; approved_by: string | null; approved_at: string | null; created_at: string }
+        Insert: { id?: string; staff_id: string; type: string; start_date: string; end_date: string; days: number; reason: string; status?: string; approved_by?: string | null; approved_at?: string | null; created_at?: string }
+        Update: { status?: string; approved_by?: string | null; approved_at?: string | null }
+        Relationships: []
+      }
+      leave_balances: {
+        Row: { id: string; staff_id: string; year: number; type: string; quota: number; used: number; created_at: string }
+        Insert: { id?: string; staff_id: string; year: number; type: string; quota?: number; used?: number; created_at?: string }
+        Update: { quota?: number; used?: number }
+        Relationships: []
+      }
+      salary_components: {
+        Row: { id: string; staff_id: string; component_type: string; name: string; amount: number; recurring: boolean; active: boolean; created_at: string }
+        Insert: { id?: string; staff_id: string; component_type: string; name: string; amount: number; recurring?: boolean; active?: boolean; created_at?: string }
+        Update: { name?: string; amount?: number; recurring?: boolean; active?: boolean }
+        Relationships: []
+      }
+      payroll_runs: {
+        Row: { id: string; branch_id: string; period_month: number; period_year: number; status: string; created_by: string | null; created_at: string }
+        Insert: { id?: string; branch_id: string; period_month: number; period_year: number; status?: string; created_by?: string | null; created_at?: string }
+        Update: { status?: string }
+        Relationships: []
+      }
+      payslips: {
+        Row: { id: string; payroll_run_id: string; staff_id: string; gross: number; total_allowances: number; total_deductions: number; overtime_amount: number; tax_amount: number; net: number; components_snapshot: Record<string, unknown> | null; status: string; created_at: string }
+        Insert: { id?: string; payroll_run_id: string; staff_id: string; gross?: number; total_allowances?: number; total_deductions?: number; overtime_amount?: number; tax_amount?: number; net?: number; components_snapshot?: Record<string, unknown> | null; status?: string; created_at?: string }
+        Update: { gross?: number; total_allowances?: number; total_deductions?: number; overtime_amount?: number; tax_amount?: number; net?: number; components_snapshot?: Record<string, unknown> | null; status?: string }
+        Relationships: []
+      }
       // ── M5 ─────────────────────────────────────────────────────────────────
       payments: {
         Row: { id: string; order_id: string; method: 'cash' | 'debit_card' | 'credit_card' | 'bank_transfer' | 'qris'; amount: number; edc_machine_id: string | null; gateway: string | null; external_id: string | null; qris_string: string | null; status: 'pending' | 'settlement' | 'expired' | 'failed'; paid_at: string | null; created_at: string }
@@ -353,6 +420,14 @@ export type Database = {
       check_and_create_booking:      { Args: { p_slot_id: string; p_customer_name: string; p_customer_phone: string; p_customer_email?: string | null; p_notes?: string | null }; Returns: CheckBookingResult }
       // Dashboard
       get_dashboard_stats:           { Args: { p_branch_id: string | null; p_from: string; p_to: string }; Returns: DashboardStats }
+      // M13 HRIS
+      clock_in:                      { Args: { p_staff_id: string; p_work_date: string }; Returns: void }
+      clock_out:                     { Args: { p_staff_id: string; p_work_date: string }; Returns: void }
+      approve_leave:                 { Args: { p_request_id: string; p_approver_id: string }; Returns: void }
+      approve_overtime:              { Args: { p_request_id: string; p_approver_id: string }; Returns: void }
+      approve_attendance_correction: { Args: { p_correction_id: string; p_approver_id: string }; Returns: void }
+      generate_payslips:             { Args: { p_payroll_run_id: string }; Returns: void }
+      finalize_payroll_run:          { Args: { p_run_id: string }; Returns: void }
     }
     Enums: Record<string, never>
   }
