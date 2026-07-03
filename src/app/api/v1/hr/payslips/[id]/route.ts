@@ -31,7 +31,7 @@ export async function PATCH(
 
   const { data: existing } = await supabase
     .from('payslips')
-    .select('status, gross, total_allowances, total_deductions, overtime_amount')
+    .select('status, gross, total_allowances, total_deductions, overtime_amount, sales_fee_amount')
     .eq('id', id)
     .single()
 
@@ -39,11 +39,12 @@ export async function PATCH(
   if (existing.status !== 'draft')
     return NextResponse.json({ error: 'Payslip hanya bisa diubah saat status draft.' }, { status: 400 })
 
-  // net = gross + overtime_amount - total_deductions - tax_amount
+  // net = gross + overtime_amount + sales_fee_amount - total_deductions - tax_amount
   // gross already includes basic + allowances — do NOT add total_allowances again
   const net =
     (existing.gross ?? 0) +
-    (existing.overtime_amount ?? 0) -
+    (existing.overtime_amount ?? 0) +
+    (existing.sales_fee_amount ?? 0) -
     (existing.total_deductions ?? 0) -
     body.tax_amount
 

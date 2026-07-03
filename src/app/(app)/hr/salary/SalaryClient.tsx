@@ -8,7 +8,7 @@ import { useToast }      from '@/components/hr/Toast'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
-interface StaffMember { id: string; name: string }
+interface StaffMember { id: string; name: string; sales_fee_pct: number | null }
 
 interface SalaryComponent {
   id:          string
@@ -32,6 +32,70 @@ const inputCls =
 
 const formatRp = (n: number) =>
   new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(n)
+
+// ── Inline-editable sales fee pct cell ───────────────────────────────────────
+
+function SalesFeePctCell({
+  staffId,
+  value,
+  onSaved,
+}: {
+  staffId: string
+  value:   number | null
+  onSaved: (pct: number) => void
+}) {
+  const { showToast } = useToast()
+  const [editing, setEditing] = useState(false)
+  const [val,     setVal]     = useState(value != null ? String(value) : '0')
+
+  async function handleBlur() {
+    const parsed = parseFloat(val)
+    if (!isNaN(parsed) && parsed >= 0 && parsed <= 100) {
+      try {
+        const res  = await fetch(`/api/v1/hr/staff/${staffId}`, {
+          method:  'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ sales_fee_pct: parsed }),
+        })
+        const json = await res.json()
+        if (!res.ok) { showToast(json.error ?? 'Gagal menyimpan.', 'error') }
+        else { onSaved(parsed) }
+      } catch {
+        showToast('Koneksi gagal.', 'error')
+      }
+    }
+    setEditing(false)
+  }
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-1">
+        <input
+          type="number"
+          value={val}
+          onChange={e => setVal(e.target.value)}
+          onBlur={handleBlur}
+          autoFocus
+          min={0}
+          max={100}
+          step={0.01}
+          className="w-20 border border-pine-400 rounded px-2 py-1 text-sm tabular-nums text-right font-sans focus:ring-2 focus:ring-pine-100 outline-none"
+        />
+        <span className="text-sm text-ink-500">%</span>
+      </div>
+    )
+  }
+
+  return (
+    <button
+      onClick={() => { setEditing(true); setVal(value != null ? String(value) : '0') }}
+      className="text-sm tabular-nums text-ink-900 hover:text-pine underline-offset-2 hover:underline transition-colors"
+      title="Klik untuk edit"
+    >
+      {value != null ? `${value}%` : '0%'}
+    </button>
+  )
+}
 
 // ── Inline-editable amount cell ───────────────────────────────────────────────
 
@@ -179,6 +243,7 @@ export function SalaryClient({ staffRole, branchId }: Props) {
   const [compLoading,  setCompLoading]  = useState(false)
   const [showAddAllow, setShowAddAllow] = useState(false)
   const [showAddDeduct, setShowAddDeduct] = useState(false)
+  const [salesFeePctMap, setSalesFeePctMap] = useState<Record<string, number | null>>({})
 
   // Fetch staff list
   useEffect(() => {
@@ -188,7 +253,11 @@ export function SalaryClient({ staffRole, branchId }: Props) {
         if (branchId) params.set('branch_id', branchId)
         const res  = await fetch(`/api/v1/staff?${params}`)
         const json = await res.json()
-        setStaffList(json.data ?? [])
+        const list: StaffMember[] = json.data ?? []
+        setStaffList(list)
+        const map: Record<string, number | null> = {}
+        list.forEach(s => { map[s.id] = s.sales_fee_pct })
+        setSalesFeePctMap(map)
       } catch { /* silent */ }
     }
     fetch_()
@@ -314,16 +383,26 @@ export function SalaryClient({ staffRole, branchId }: Props) {
             </div>
           )}
           {selectedStaff && !search && (
-            <div className="mt-2 flex items-center justify-between">
-              <p className="text-sm font-medium text-ink-900">
-                Dipilih: <span className="text-pine">{selectedStaff.name}</span>
-              </p>
-              <button
-                onClick={() => setSelectedId(null)}
-                className="text-xs text-ink-500 underline underline-offset-2 hover:no-underline"
-              >
-                Ganti
-              </button>
+            <div className="mt-2 space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-ink-900">
+                  Dipilih: <span className="text-pine">{selectedStaff.name}</span>
+                </p>
+                <button
+                  onClick={() => setSelectedId(null)}
+                  className="text-xs text-ink-500 underline underline-offset-2 hover:no-underline"
+                >
+                  Ganti
+                </button>
+              </div>
+              <div className="flex items-center justify-between py-2 border-t border-line">
+                <span className="text-xs text-ink-500">Komisi Penjualan (%)</span>
+                <SalesFeePctCell
+                  staffId={selectedStaff.id}
+                  value={salesFeePctMap[selectedStaff.id] ?? null}
+                  onSaved={pct => setSalesFeePctMap(prev => ({ ...prev, [selectedStaff.id]: pct }))}
+                />
+              </div>
             </div>
           )}
         </FormCard>

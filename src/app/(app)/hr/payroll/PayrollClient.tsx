@@ -55,6 +55,8 @@ export function PayrollClient({ staffRole, branchId, branches }: Props) {
   const [loading,      setLoading]      = useState(true)
   const [filterBranch, setFilterBranch] = useState(branchId ?? '')
   const [filterYear,   setFilterYear]   = useState(String(now.getFullYear()))
+  const [filterMonth,  setFilterMonth]  = useState('')
+  const [exporting,    setExporting]    = useState(false)
 
   // New payroll sheet
   const [sheetOpen,    setSheetOpen]    = useState(false)
@@ -68,6 +70,7 @@ export function PayrollClient({ staffRole, branchId, branches }: Props) {
     try {
       const params = new URLSearchParams({ year: filterYear })
       if (filterBranch) params.set('branch_id', filterBranch)
+      if (filterMonth)  params.set('month', filterMonth)
       const res  = await fetch(`/api/v1/hr/payroll?${params}`)
       const json = await res.json()
       if (!res.ok) { showToast(json.error ?? 'Gagal memuat data.', 'error'); return }
@@ -77,9 +80,36 @@ export function PayrollClient({ staffRole, branchId, branches }: Props) {
     } finally {
       setLoading(false)
     }
-  }, [filterBranch, filterYear, showToast])
+  }, [filterBranch, filterYear, filterMonth, showToast])
 
   useEffect(() => { fetchRuns() }, [fetchRuns])
+
+  async function handleExport() {
+    setExporting(true)
+    try {
+      const params = new URLSearchParams({ period_year: filterYear })
+      if (filterMonth)  params.set('period_month', filterMonth)
+      if (filterBranch) params.set('branch_id', filterBranch)
+      const res = await fetch(`/api/v1/hr/payroll/export?${params}`)
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        showToast(json.error ?? 'Gagal export.', 'error')
+        return
+      }
+      const blob = await res.blob()
+      const url  = URL.createObjectURL(blob)
+      const a    = document.createElement('a')
+      a.href     = url
+      const month  = filterMonth ? `_${MONTHS[parseInt(filterMonth) - 1]}` : ''
+      a.download = `payroll${month}_${filterYear}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      showToast('Koneksi gagal.', 'error')
+    } finally {
+      setExporting(false)
+    }
+  }
 
   async function handleCreate() {
     if (!newBranch) { showToast('Pilih cabang terlebih dahulu.', 'error'); return }
@@ -107,10 +137,19 @@ export function PayrollClient({ staffRole, branchId, branches }: Props) {
     return { value: y, label: y }
   })
 
+  const monthOpts = [
+    { value: '', label: 'Semua Bulan' },
+    ...MONTHS.map((m, i) => ({ value: String(i + 1), label: m })),
+  ]
+
   const filterFields = [
     {
       key: 'year', type: 'select' as const, label: 'Tahun', value: filterYear, onChange: setFilterYear,
       options: yearOpts,
+    },
+    {
+      key: 'month', type: 'select' as const, label: 'Bulan', value: filterMonth, onChange: setFilterMonth,
+      options: monthOpts,
     },
     {
       key: 'branch', type: 'select' as const, label: 'Cabang', value: filterBranch, onChange: setFilterBranch,
@@ -122,17 +161,30 @@ export function PayrollClient({ staffRole, branchId, branches }: Props) {
     <div className="bg-sand-50 min-h-full p-4 md:p-6">
       <div className="max-w-3xl mx-auto">
         <SectionHeader title="Penggajian">
-          <button
-            onClick={() => setSheetOpen(true)}
-            className="bg-pine text-white rounded-lg px-4 py-2 text-sm font-sans font-semibold hover:bg-pine-700 transition-colors"
-          >
-            + Buat Payroll
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={handleExport}
+              disabled={exporting}
+              className="border border-line rounded-lg px-3 py-2 text-sm font-sans font-semibold text-ink-900 bg-white hover:bg-sand-50 disabled:opacity-45 transition-colors flex items-center gap-1.5"
+            >
+              {exporting
+                ? <span className="w-3.5 h-3.5 border-2 border-ink-400 border-t-transparent rounded-full animate-spin" />
+                : <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M8 2v8m0 0-3-3m3 3 3-3M3 13h10"/></svg>
+              }
+              Export CSV
+            </button>
+            <button
+              onClick={() => setSheetOpen(true)}
+              className="bg-pine text-white rounded-lg px-4 py-2 text-sm font-sans font-semibold hover:bg-pine-700 transition-colors"
+            >
+              + Buat Payroll
+            </button>
+          </div>
         </SectionHeader>
 
         <FilterBar
           fields={filterFields}
-          onReset={() => { setFilterBranch(branchId ?? ''); setFilterYear(String(now.getFullYear())) }}
+          onReset={() => { setFilterBranch(branchId ?? ''); setFilterYear(String(now.getFullYear())); setFilterMonth('') }}
         />
 
         {loading ? (

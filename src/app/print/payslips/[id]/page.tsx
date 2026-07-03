@@ -34,7 +34,7 @@ export default async function PrintPayslipPage({ params }: Props) {
   const { data: slip } = await supabase
     .from('payslips')
     .select(`
-      id, gross, total_allowances, total_deductions, overtime_amount, tax_amount, net,
+      id, gross, total_allowances, total_deductions, overtime_amount, sales_fee_amount, tax_amount, net,
       components_snapshot,
       staff:staff_id ( name, branch:branch_id ( name ) ),
       payroll_run:payroll_run_id ( period_month, period_year )
@@ -115,6 +115,14 @@ export default async function PrintPayslipPage({ params }: Props) {
           <div className="flex justify-between text-sm py-1.5">
             <span className="text-gray-700">Lembur</span>
             <span className="tabular-nums font-medium text-gray-900">{formatRp((slip as any).overtime_amount)}</span>
+          </div>
+        )}
+
+        {/* Komisi Penjualan */}
+        {(slip as any).sales_fee_amount > 0 && (
+          <div className="flex justify-between text-sm py-1.5">
+            <span className="text-gray-700">Komisi Penjualan</span>
+            <span className="tabular-nums font-medium text-gray-900">{formatRp((slip as any).sales_fee_amount)}</span>
           </div>
         )}
 

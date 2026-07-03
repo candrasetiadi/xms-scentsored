@@ -1026,18 +1026,30 @@ interface SalesPickerProps {
 }
 
 function SalesPicker({ staffList, salesStaffId, salesStaffName, onSelect }: SalesPickerProps) {
-  const [open, setOpen] = useState(false)
-  const containerRef    = useRef<HTMLDivElement>(null)
+  const [open,   setOpen]   = useState(false)
+  const [query,  setQuery]  = useState('')
+  const containerRef        = useRef<HTMLDivElement>(null)
+  const searchRef           = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     function onMouseDown(e: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setOpen(false)
+        setQuery('')
       }
     }
     document.addEventListener('mousedown', onMouseDown)
     return () => document.removeEventListener('mousedown', onMouseDown)
   }, [])
+
+  useEffect(() => {
+    if (open) setTimeout(() => searchRef.current?.focus(), 50)
+    else setQuery('')
+  }, [open])
+
+  const filtered = query.trim()
+    ? staffList.filter(s => s.name.toLowerCase().includes(query.toLowerCase()))
+    : staffList
 
   return (
     <div ref={containerRef} className="relative">
@@ -1087,25 +1099,41 @@ function SalesPicker({ staffList, salesStaffId, salesStaffName, onSelect }: Sale
 
       {open && (
         <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-white border border-line rounded-lg shadow-lg overflow-hidden">
-          {staffList.length === 0 ? (
-            <p className="text-xs text-ink-400 px-3 py-2.5">Tidak ada staff tersedia.</p>
-          ) : (
-            staffList.map(s => (
-              <button
-                key={s.id}
-                type="button"
-                onMouseDown={e => { e.preventDefault(); onSelect(s.id, s.name); setOpen(false) }}
-                className={`w-full flex items-center justify-between px-3 py-2.5 hover:bg-sand-50 text-left transition-colors ${
-                  s.id === salesStaffId ? 'bg-pine-50' : ''
-                }`}
-              >
-                <span className="text-[13px] font-medium text-ink-900 truncate">{s.name}</span>
-                <span className="text-[11px] text-ink-400 ml-2 shrink-0">
-                  {STAFF_ROLE_LABEL[s.role] ?? s.role}
-                </span>
-              </button>
-            ))
-          )}
+          {/* Search input */}
+          <div className="px-2 py-2 border-b border-line">
+            <input
+              ref={searchRef}
+              type="text"
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder="Cari nama sales..."
+              className="w-full text-[13px] px-2.5 py-1.5 border border-line rounded-md outline-none focus:border-pine-400 focus:ring-1 focus:ring-pine-100 placeholder:text-ink-300 text-ink-900 bg-white"
+            />
+          </div>
+          {/* List */}
+          <div className="max-h-48 overflow-y-auto">
+            {filtered.length === 0 ? (
+              <p className="text-xs text-ink-400 px-3 py-2.5">
+                {query ? `Tidak ada hasil untuk "${query}".` : 'Tidak ada staff tersedia.'}
+              </p>
+            ) : (
+              filtered.map(s => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onMouseDown={e => { e.preventDefault(); onSelect(s.id, s.name); setOpen(false); setQuery('') }}
+                  className={`w-full flex items-center justify-between px-3 py-2.5 hover:bg-sand-50 text-left transition-colors ${
+                    s.id === salesStaffId ? 'bg-pine-50' : ''
+                  }`}
+                >
+                  <span className="text-[13px] font-medium text-ink-900 truncate">{s.name}</span>
+                  <span className="text-[11px] text-ink-400 ml-2 shrink-0">
+                    {STAFF_ROLE_LABEL[s.role] ?? s.role}
+                  </span>
+                </button>
+              ))
+            )}
+          </div>
         </div>
       )}
     </div>
