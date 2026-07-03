@@ -24,13 +24,15 @@ export async function POST(
   const { id } = await params
   if (!UUID_RE.test(id)) return NextResponse.json({ error: 'id tidak valid.' }, { status: 400 })
 
-  const { data: run } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = supabase as any
+  const { data: run } = await db
     .from('vendor_payroll_runs').select('id, status').eq('id', id).single()
   if (!run) return NextResponse.json({ error: 'Vendor payroll run tidak ditemukan.' }, { status: 404 })
   if (run.status !== 'draft')
     return NextResponse.json({ error: 'generate hanya bisa dilakukan saat status draft.' }, { status: 400 })
 
-  const { error } = await supabase.rpc('generate_vendor_payslips', { p_run_id: id })
+  const { error } = await db.rpc('generate_vendor_payslips', { p_run_id: id })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   return NextResponse.json({ data: { message: 'Payslip vendor berhasil digenerate' } })

@@ -6,7 +6,6 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 // POST /api/v1/workshop/materials/[id]/restock
 // Tambah stok bahan workshop. Manager only.
 // Body: { qty_gram: number (> 0), notes?: string }
-// Efek: insert movement type 'restock' + update stock_gram.
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -42,8 +41,10 @@ export async function POST(
 
   const notes = typeof body.notes === 'string' ? body.notes : null
 
-  // Fetch stok saat ini
-  const { data: current, error: fetchErr } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = supabase as any
+
+  const { data: current, error: fetchErr } = await db
     .from('workshop_materials')
     .select('stock_gram')
     .eq('id', id)
@@ -52,8 +53,7 @@ export async function POST(
   if (fetchErr || !current)
     return NextResponse.json({ error: 'Material tidak ditemukan.' }, { status: 404 })
 
-  // Insert restock movement
-  const { error: movErr } = await supabase
+  const { error: movErr } = await db
     .from('workshop_stock_movements')
     .insert({
       material_id:   id,
@@ -65,9 +65,8 @@ export async function POST(
 
   if (movErr) return NextResponse.json({ error: movErr.message }, { status: 500 })
 
-  // Update stock_gram
   const newStockGram = current.stock_gram + qtyGram
-  const { error: updateErr } = await supabase
+  const { error: updateErr } = await db
     .from('workshop_materials')
     .update({ stock_gram: newStockGram })
     .eq('id', id)

@@ -23,7 +23,7 @@ export default async function WorkshopPage({
   if (slot_id) {
     const supabase = await createClient()
     const { data } = await supabase
-      .from('workshop_slots')
+      .from('consultation_slots')
       .select('date, start_time, end_time')
       .eq('id', slot_id)
       .single()

@@ -2,7 +2,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import { isMidtransConfigured, checkTransactionStatus } from '@/lib/midtrans'
 import { isGoogleCalendarConfigured } from '@/lib/google-calendar'
-import { syncCalendar } from '../../route'
+import { syncCalendar } from '@/lib/calendar-sync'
 
 // GET /api/v1/bookings/:id/payment-status
 // Publik — dipakai polling countdown timer di halaman booking

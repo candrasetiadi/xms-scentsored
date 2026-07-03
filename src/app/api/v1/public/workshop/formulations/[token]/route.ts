@@ -21,9 +21,7 @@ type RawCustomer = { name: string; phone: string | null; email: string | null } 
 type RawSlot    = { date: string; start_time: string; end_time: string } | null
 
 // GET /api/v1/public/workshop/formulations/[token]
-// Kembalikan detail formulasi berdasarkan access_token (UUID).
-// Tidak memerlukan auth — link berbasis token.
-// 404 jika token tidak ditemukan.
+// Kembalikan detail formulasi berdasarkan access_token. Tidak memerlukan auth.
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ token: string }> },
@@ -34,8 +32,10 @@ export async function GET(
     return NextResponse.json({ error: 'Token tidak valid.' }, { status: 400 })
 
   const admin = createAdminClient()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = admin as any
 
-  const { data, error } = await admin
+  const { data, error } = await db
     .from('workshop_formulations')
     .select(`
       id, access_token, perfume_name, theme, contact_socmed, notes,
@@ -56,23 +56,23 @@ export async function GET(
   if (error || !data)
     return NextResponse.json({ error: 'Formulasi tidak ditemukan.' }, { status: 404 })
 
-  const customer = data.customers         as unknown as RawCustomer
-  const slot     = data.consultation_slots as unknown as RawSlot
-  const items    = (data.workshop_formulation_items as unknown as RawItem[]) ?? []
+  const customer = data.customers         as RawCustomer
+  const slot     = data.consultation_slots as RawSlot
+  const items    = (data.workshop_formulation_items as RawItem[]) ?? []
 
   return NextResponse.json({
     data: {
-      id:            data.id,
-      access_token:  data.access_token,
-      perfume_name:  data.perfume_name,
-      theme:         data.theme,
+      id:             data.id,
+      access_token:   data.access_token,
+      perfume_name:   data.perfume_name,
+      theme:          data.theme,
       contact_socmed: data.contact_socmed,
-      notes:         data.notes,
-      total_grams:   data.total_grams,
-      status:        data.status,
-      created_at:    data.created_at,
-      customer:      customer ?? null,
-      slot:          slot
+      notes:          data.notes,
+      total_grams:    data.total_grams,
+      status:         data.status,
+      created_at:     data.created_at,
+      customer:       customer ?? null,
+      slot:           slot
         ? { date: slot.date, start_time: slot.start_time, end_time: slot.end_time }
         : null,
       items: items
@@ -81,15 +81,15 @@ export async function GET(
           const mat = item.workshop_materials
           const cat = mat?.scent_categories ?? null
           return {
-            line_no: item.line_no,
-            drops:   item.drops,
-            grams:   item.grams,
-            adj:     item.adj,
+            line_no:  item.line_no,
+            drops:    item.drops,
+            grams:    item.grams,
+            adj:      item.adj,
             material: mat
               ? {
-                  name:                 mat.name,
-                  dilution_percentage:  mat.dilution_percentage,
-                  category:             cat ? { name: cat.name, color_hex: cat.color_hex } : null,
+                  name:                mat.name,
+                  dilution_percentage: mat.dilution_percentage,
+                  category:            cat ? { name: cat.name, color_hex: cat.color_hex } : null,
                 }
               : null,
           }

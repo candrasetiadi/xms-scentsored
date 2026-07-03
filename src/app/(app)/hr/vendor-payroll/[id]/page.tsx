@@ -26,7 +26,9 @@ export default async function VendorPayrollDetailPage({ params }: Props) {
     redirect('/hr/attendance')
   }
 
-  const { data: run } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = supabase as any
+  const { data: run } = await db
     .from('vendor_payroll_runs')
     .select('id, period_month, period_year, status, total_amount, branch_id, branches(name)')
     .eq('id', id)

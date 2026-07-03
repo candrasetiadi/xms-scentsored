@@ -5,8 +5,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 // PATCH /api/v1/workshop/materials/[id]
 // Update data bahan workshop. Manager only.
-// Body (semua opsional): { name, dilution_percentage, category_id, stock_gram, active }
-// Jika stock_gram berubah, otomatis insert movement type 'adjustment' dengan qty_change = selisih.
+// Jika stock_gram berubah, otomatis insert movement type 'adjustment'.
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -42,8 +41,10 @@ export async function PATCH(
     return NextResponse.json({ error: 'Body tidak valid.' }, { status: 400 })
   }
 
-  // Fetch material saat ini untuk perbandingan stok
-  const { data: current, error: fetchErr } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = supabase as any
+
+  const { data: current, error: fetchErr } = await db
     .from('workshop_materials')
     .select('stock_gram')
     .eq('id', id)
@@ -52,10 +53,9 @@ export async function PATCH(
   if (fetchErr || !current)
     return NextResponse.json({ error: 'Material tidak ditemukan.' }, { status: 404 })
 
-  // Jika stock_gram berubah, catat adjustment movement
   if (typeof body.stock_gram === 'number' && body.stock_gram !== current.stock_gram) {
     const qtyChange = body.stock_gram - current.stock_gram
-    const { error: movErr } = await supabase
+    const { error: movErr } = await db
       .from('workshop_stock_movements')
       .insert({
         material_id:   id,
@@ -67,7 +67,6 @@ export async function PATCH(
     if (movErr) return NextResponse.json({ error: movErr.message }, { status: 500 })
   }
 
-  // Bangun payload update — hanya field yang dikirim
   const updatePayload: Record<string, unknown> = {}
   if (body.name                !== undefined) updatePayload.name                = body.name
   if (body.dilution_percentage !== undefined) updatePayload.dilution_percentage = body.dilution_percentage
@@ -78,7 +77,7 @@ export async function PATCH(
   if (Object.keys(updatePayload).length === 0)
     return NextResponse.json({ error: 'Tidak ada field yang diubah.' }, { status: 400 })
 
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('workshop_materials')
     .update(updatePayload)
     .eq('id', id)
