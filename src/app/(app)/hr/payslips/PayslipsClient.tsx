@@ -29,6 +29,7 @@ interface PayslipDetail extends PayslipSummary {
   basic:               number
   allowances:          number
   overtime:            number
+  sales_fee_amount:    number
   deductions:          number
   tax_amount:          number
   components_snapshot: ComponentSnapshot[]
@@ -91,6 +92,13 @@ function SlipDetail({ slip }: { slip: PayslipDetail }) {
         <div className="flex justify-between text-sm py-1.5">
           <span className="text-ink-700">Lembur</span>
           <span className="tabular-nums text-ink-900">{formatRp(slip.overtime)}</span>
+        </div>
+      )}
+
+      {slip.sales_fee_amount > 0 && (
+        <div className="flex justify-between text-sm py-1.5">
+          <span className="text-ink-700">Komisi Penjualan</span>
+          <span className="tabular-nums text-ink-900">{formatRp(slip.sales_fee_amount)}</span>
         </div>
       )}
 

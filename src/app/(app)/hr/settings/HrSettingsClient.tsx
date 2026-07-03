@@ -12,6 +12,7 @@ interface Branch { id: string; name: string }
 interface HrSettings {
   late_tolerance_minutes: number
   overtime_rate_per_hour: number
+  vendor_fee_per_tx:      number
 }
 
 interface Props {
@@ -35,6 +36,7 @@ export function HrSettingsClient({ staffRole, branchId, branches }: Props) {
   const [selectedBranch,   setSelectedBranch]   = useState(isOwner ? '' : (branchId ?? ''))
   const [tolerance,        setTolerance]         = useState('15')
   const [overtimeRate,     setOvertimeRate]      = useState('25000')
+  const [vendorFee,        setVendorFee]         = useState('500')
   const [loading,          setLoading]           = useState(false)
   const [saving,           setSaving]            = useState(false)
 
@@ -47,6 +49,7 @@ export function HrSettingsClient({ staffRole, branchId, branches }: Props) {
         if (json.data) {
           setTolerance(String(json.data.late_tolerance_minutes ?? 15))
           setOvertimeRate(String(json.data.overtime_rate_per_hour ?? 25000))
+          setVendorFee(String(json.data.vendor_fee_per_tx ?? 500))
         }
       })
       .catch(() => showToast('Gagal memuat pengaturan.', 'error'))
@@ -55,9 +58,10 @@ export function HrSettingsClient({ staffRole, branchId, branches }: Props) {
 
   async function handleSave() {
     if (!selectedBranch) { showToast('Pilih cabang terlebih dahulu.', 'error'); return }
-    const tolMin  = parseInt(tolerance, 10)
-    const otRate  = parseInt(overtimeRate.replace(/\D/g, ''), 10)
-    if (isNaN(tolMin) || isNaN(otRate)) { showToast('Nilai tidak valid.', 'error'); return }
+    const tolMin    = parseInt(tolerance, 10)
+    const otRate    = parseInt(overtimeRate.replace(/\D/g, ''), 10)
+    const vendorFeeVal = parseInt(vendorFee.replace(/\D/g, ''), 10)
+    if (isNaN(tolMin) || isNaN(otRate) || isNaN(vendorFeeVal)) { showToast('Nilai tidak valid.', 'error'); return }
 
     setSaving(true)
     try {
@@ -68,6 +72,7 @@ export function HrSettingsClient({ staffRole, branchId, branches }: Props) {
           branch_id:               selectedBranch,
           late_tolerance_minutes:  tolMin,
           overtime_rate_per_hour:  otRate,
+          vendor_fee_per_tx:       vendorFeeVal,
         }),
       })
       const json = await res.json()
@@ -157,6 +162,29 @@ export function HrSettingsClient({ staffRole, branchId, branches }: Props) {
                   </div>
                   <p className="text-xs text-ink-400 mt-1">
                     Dasar perhitungan biaya lembur per jam kerja tambahan.
+                  </p>
+                </div>
+
+                {/* Tarif Fee Vendor */}
+                <div>
+                  <label className="text-xs text-ink-500 mb-1 block">
+                    Tarif Fee Vendor (Rp/transaksi)
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-ink-500 whitespace-nowrap">Rp</span>
+                    <input
+                      type="number"
+                      value={vendorFee}
+                      onChange={e => setVendorFee(e.target.value)}
+                      min={0}
+                      step={100}
+                      className={inputCls}
+                      placeholder="500"
+                    />
+                    <span className="text-sm text-ink-500 whitespace-nowrap">/transaksi</span>
+                  </div>
+                  <p className="text-xs text-ink-400 mt-1">
+                    Fee yang dibayarkan ke vendor per transaksi yang ditangani.
                   </p>
                 </div>
 

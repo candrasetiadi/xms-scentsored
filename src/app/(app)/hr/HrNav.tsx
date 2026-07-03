@@ -19,6 +19,8 @@ function ShiftIcon()    { return <svg width="16" height="16" viewBox="0 0 16 16"
 function SalaryIcon()   { return <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M8 5v1.5M8 9.5V11M6.5 7A1.5 1.5 0 0 1 8 5.5h0A1.5 1.5 0 0 1 9.5 7h0A1.5 1.5 0 0 1 8 8.5h0A1.5 1.5 0 0 1 9.5 10"/></svg> }
 function PayrollIcon()  { return <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 4h12M2 8h8M2 12h5"/><path d="M11 9l2 2 3-3"/></svg> }
 function SettingIcon()  { return <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="2.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3 3l1.4 1.4M11.6 11.6L13 13M3 13l1.4-1.4M11.6 4.4L13 3"/></svg> }
+function VendorIcon()   { return <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 13V6l6-4 6 4v7"/><path d="M6 13V9h4v4"/><rect x="6" y="3" width="4" height="3" rx="0.5"/></svg> }
+function VendorPayIcon(){ return <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="1" y="4" width="14" height="9" rx="1"/><path d="M1 7h14"/><circle cx="8" cy="10.5" r="1.5"/></svg> }
 
 const STAFF_ITEMS: NavItem[] = [
   { label: 'Absensi Saya', href: '/hr/attendance',        icon: <ClockIcon />,   admin: false },
@@ -32,9 +34,10 @@ const ADMIN_ITEMS: NavItem[] = [
   { label: 'Lembur',        href: '/hr/overtime',          icon: <OvertimeIcon />, admin: true },
   { label: 'Cuti',           href: '/hr/leave',             icon: <LeaveIcon />,   admin: true },
   { label: 'Shift & Jadwal',href: '/hr/shifts',            icon: <ShiftIcon />,   admin: true },
-  { label: 'Komponen Gaji', href: '/hr/salary',            icon: <SalaryIcon />,  admin: true },
-  { label: 'Payroll',        href: '/hr/payroll',           icon: <PayrollIcon />, admin: true },
-  { label: 'Pengaturan SDM',href: '/hr/settings',          icon: <SettingIcon />, admin: true },
+  { label: 'Komponen Gaji', href: '/hr/salary',            icon: <SalaryIcon />,    admin: true },
+  { label: 'Payroll',        href: '/hr/payroll',           icon: <PayrollIcon />,  admin: true },
+  { label: 'Vendor',         href: '/hr/vendors',           icon: <VendorIcon />,   admin: true },
+  { label: 'Pengaturan SDM',href: '/hr/settings',          icon: <SettingIcon />,  admin: true },
 ]
 
 interface Props {

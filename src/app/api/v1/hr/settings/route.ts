@@ -33,6 +33,7 @@ export async function GET(request: Request) {
       branch_id: branchId,
       late_tolerance_minutes: 15,
       overtime_rate_per_hour: 25000,
+      vendor_fee_per_tx: 500,
     }
   })
 }
@@ -55,6 +56,7 @@ export async function PUT(request: Request) {
     branch_id?: string
     late_tolerance_minutes?: number
     overtime_rate_per_hour?: number
+    vendor_fee_per_tx?: number
   }
 
   const branchId = body.branch_id ?? staff.branch_id
@@ -67,6 +69,9 @@ export async function PUT(request: Request) {
   if (body.overtime_rate_per_hour != null && (typeof body.overtime_rate_per_hour !== 'number' || body.overtime_rate_per_hour < 0))
     return NextResponse.json({ error: 'overtime_rate_per_hour harus angka >= 0.' }, { status: 400 })
 
+  if (body.vendor_fee_per_tx != null && (typeof body.vendor_fee_per_tx !== 'number' || !Number.isInteger(body.vendor_fee_per_tx) || body.vendor_fee_per_tx < 0))
+    return NextResponse.json({ error: 'vendor_fee_per_tx harus integer >= 0.' }, { status: 400 })
+
   const { data, error } = await supabase
     .from('hr_settings')
     .upsert(
@@ -74,6 +79,7 @@ export async function PUT(request: Request) {
         branch_id: branchId,
         ...(body.late_tolerance_minutes != null ? { late_tolerance_minutes: body.late_tolerance_minutes } : {}),
         ...(body.overtime_rate_per_hour != null ? { overtime_rate_per_hour: body.overtime_rate_per_hour } : {}),
+        ...(body.vendor_fee_per_tx != null ? { vendor_fee_per_tx: body.vendor_fee_per_tx } : {}),
       },
       { onConflict: 'branch_id' }
     )

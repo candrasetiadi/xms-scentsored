@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { sendInvoiceWa } from '@/lib/messaging'
 import { isGoogleCalendarConfigured } from '@/lib/google-calendar'
-import { syncCalendar } from '../../bookings/route'
+import { syncCalendar } from '@/lib/calendar-sync'
 
 // POST /api/v1/webhooks/midtrans  — publik, dikecualikan dari middleware auth
 // Menangani settlement untuk POS order DAN booking konsultasi secara idempotent.

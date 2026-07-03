@@ -12,14 +12,15 @@ import { useToast }      from '@/components/hr/Toast'
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 interface Payslip {
-  id:          string
-  staff_name:  string
-  basic:       number
-  allowances:  number
-  overtime:    number
-  deductions:  number
-  tax_amount:  number
-  net:         number
+  id:               string
+  staff_name:       string
+  basic:            number
+  allowances:       number
+  overtime:         number
+  sales_fee_amount: number
+  deductions:       number
+  tax_amount:       number
+  net:              number
 }
 
 interface Props {
@@ -130,7 +131,7 @@ export function PayrollDetailClient({ runId, month, year, status: initialStatus,
       const json = await res.json()
       if (!res.ok) { showToast(json.error ?? 'Gagal menyimpan pajak.', 'error'); return }
       setPayslips(prev =>
-        prev.map(p => p.id === payslipId ? { ...p, tax_amount: amount, net: p.basic + p.allowances + p.overtime - p.deductions - amount } : p)
+        prev.map(p => p.id === payslipId ? { ...p, tax_amount: amount, net: p.basic + p.allowances + p.overtime + p.sales_fee_amount - p.deductions - amount } : p)
       )
     } catch {
       showToast('Koneksi gagal.', 'error')
@@ -231,6 +232,7 @@ export function PayrollDetailClient({ runId, month, year, status: initialStatus,
                 <Th right>Gaji Pokok</Th>
                 <Th right>Tunjangan</Th>
                 <Th right>Lembur</Th>
+                <Th right>Komisi</Th>
                 <Th right>Potongan</Th>
                 <Th right>Pajak</Th>
                 <Th right>Net</Th>
@@ -243,6 +245,7 @@ export function PayrollDetailClient({ runId, month, year, status: initialStatus,
                   <Td right>{formatRp(p.basic)}</Td>
                   <Td right>{formatRp(p.allowances)}</Td>
                   <Td right>{p.overtime > 0 ? formatRp(p.overtime) : '–'}</Td>
+                  <Td right>{p.sales_fee_amount > 0 ? formatRp(p.sales_fee_amount) : '–'}</Td>
                   <Td right>{p.deductions > 0 ? formatRp(p.deductions) : '–'}</Td>
                   <Td right>
                     {isDraft ? (

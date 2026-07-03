@@ -21,6 +21,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Laporan',     href: '/reporting',          roles: ['owner', 'admin'] },
   { label: 'Booking',     href: '/admin/slots',      roles: ['owner', 'admin'] },
   { label: 'Master Data', href: '/admin/products',   roles: ['owner', 'admin'] },
+  { label: 'Workshop',    href: '/admin/workshop',   roles: ['owner', 'admin'] },
   { label: 'SDM',         href: '/hr',               roles: ['owner', 'admin', 'cashier', 'perfumer', 'stock_keeper'] },
 ]
 
