@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import Link                from 'next/link'
+import { useSearchParams }  from 'next/navigation'
 import { SectionHeader }   from '@/components/hr/SectionHeader'
 import { StatusBadge }     from '@/components/hr/StatusBadge'
 import { BottomSheet }     from '@/components/hr/BottomSheet'
@@ -43,11 +44,16 @@ const inputCls =
 
 export function VendorPayrollClient({ staffRole, branchId, branches }: Props) {
   const { showToast } = useToast()
+  const searchParams  = useSearchParams()
   const isOwner = staffRole === 'owner'
+
+  const initialBranch = isOwner
+    ? (searchParams.get('branch_id') ?? '')
+    : (branchId ?? '')
 
   const [runs,         setRuns]         = useState<VendorPayrollRun[]>([])
   const [loading,      setLoading]      = useState(true)
-  const [filterBranch, setFilterBranch] = useState(isOwner ? '' : (branchId ?? ''))
+  const [filterBranch, setFilterBranch] = useState(initialBranch)
   const [filterStatus, setFilterStatus] = useState('')
   const [sheetOpen,    setSheetOpen]    = useState(false)
   const [saving,       setSaving]       = useState(false)

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Link                from 'next/link'
 import { SectionHeader }   from '@/components/hr/SectionHeader'
 import { StatusBadge }     from '@/components/hr/StatusBadge'
 import { BottomSheet }     from '@/components/hr/BottomSheet'
@@ -225,9 +226,15 @@ export function VendorsClient({ staffRole, branchId, branches }: Props) {
                   </Td>
                   <Td>
                     <div className="flex items-center gap-3">
+                      <Link
+                        href={`/hr/vendor-payroll?branch_id=${v.branch_id}`}
+                        className="text-xs text-pine underline underline-offset-2 hover:no-underline"
+                      >
+                        Gaji Vendor →
+                      </Link>
                       <button
                         onClick={() => openEdit(v)}
-                        className="text-xs text-pine underline underline-offset-2 hover:no-underline"
+                        className="text-xs text-ink-500 underline underline-offset-2 hover:no-underline"
                       >
                         Edit
                       </button>

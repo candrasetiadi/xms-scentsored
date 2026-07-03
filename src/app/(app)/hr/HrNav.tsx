@@ -37,7 +37,6 @@ const ADMIN_ITEMS: NavItem[] = [
   { label: 'Komponen Gaji', href: '/hr/salary',            icon: <SalaryIcon />,    admin: true },
   { label: 'Payroll',        href: '/hr/payroll',           icon: <PayrollIcon />,  admin: true },
   { label: 'Vendor',         href: '/hr/vendors',           icon: <VendorIcon />,   admin: true },
-  { label: 'Gaji Vendor',   href: '/hr/vendor-payroll',    icon: <VendorPayIcon />, admin: true },
   { label: 'Pengaturan SDM',href: '/hr/settings',          icon: <SettingIcon />,  admin: true },
 ]
 
