@@ -32,18 +32,26 @@ interface FormulationItem {
   adj:         ItemAdj
 }
 
-interface SlotInfo { date: string; start_time: string; end_time: string }
+interface SlotOption {
+  id:         string
+  date:       string
+  start_time: string
+  end_time:   string
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const DAYS_ID   = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab']
-const MONTHS_ID = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des']
+const DAYS   = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 function fmtDate(d: string) {
   const dt = new Date(d + 'T00:00:00')
-  return `${DAYS_ID[dt.getDay()]}, ${dt.getDate()} ${MONTHS_ID[dt.getMonth()]}`
+  return `${DAYS[dt.getDay()]}, ${dt.getDate()} ${MONTHS[dt.getMonth()]}`
 }
 function fmtTime(t: string) { return t.slice(0, 5) }
+function fmtSlotLabel(slot: SlotOption) {
+  return `${fmtDate(slot.date)}  ·  ${fmtTime(slot.start_time)} – ${fmtTime(slot.end_time)}`
+}
 const formatGram = (n: number) => n % 1 === 0 ? `${n}g` : `${n.toFixed(2)}g`
 
 let _keyCounter = 0
@@ -77,23 +85,20 @@ function CategoryPill({ category }: { category: ScentCategory | null }) {
 // ── MaterialPicker ────────────────────────────────────────────────────────────
 
 interface MaterialPickerProps {
-  materials:      WorkshopMaterial[]
-  selectedIds:    Set<string>
-  onSelect:       (material: WorkshopMaterial) => void
-  onClose:        () => void
+  materials:   WorkshopMaterial[]
+  selectedIds: Set<string>
+  onSelect:    (material: WorkshopMaterial) => void
+  onClose:     () => void
 }
 
 function MaterialPicker({ materials, selectedIds, onSelect, onClose }: MaterialPickerProps) {
-  const [search,          setSearch]          = useState('')
-  const [categoryFilter,  setCategoryFilter]  = useState<string | null>(null)
+  const [search,         setSearch]         = useState('')
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null)
   const debouncedSearch = useDebounce(search, 300)
   const searchRef       = useRef<HTMLInputElement>(null)
 
-  useEffect(() => {
-    searchRef.current?.focus()
-  }, [])
+  useEffect(() => { searchRef.current?.focus() }, [])
 
-  // Unique categories
   const categories = useMemo<ScentCategory[]>(() => {
     const seen = new Map<string, ScentCategory>()
     materials.forEach(m => {
@@ -105,8 +110,8 @@ function MaterialPicker({ materials, selectedIds, onSelect, onClose }: MaterialP
   const filtered = useMemo(() => {
     const q = debouncedSearch.toLowerCase().trim()
     return materials.filter(m => {
-      const matchName = !q || m.name.toLowerCase().includes(q)
-      const matchCat  = !q || (m.category?.name.toLowerCase().includes(q) ?? false)
+      const matchName   = !q || m.name.toLowerCase().includes(q)
+      const matchCat    = !q || (m.category?.name.toLowerCase().includes(q) ?? false)
       const matchFilter = !categoryFilter || m.category?.id === categoryFilter
       return (matchName || matchCat) && matchFilter
     }).slice(0, 50)
@@ -127,7 +132,7 @@ function MaterialPicker({ materials, selectedIds, onSelect, onClose }: MaterialP
           <input
             ref={searchRef}
             type="search"
-            placeholder="Cari bahan..."
+            placeholder="Search ingredients..."
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-line bg-sand-50 text-sm text-ink-900 outline-none focus:ring-2 focus:ring-pine-200 focus:border-pine"
@@ -137,7 +142,7 @@ function MaterialPicker({ materials, selectedIds, onSelect, onClose }: MaterialP
           onClick={onClose}
           className="px-3 py-2 rounded-xl border border-line text-sm text-ink-600 hover:bg-sand-100 transition-colors"
         >
-          Batal
+          Cancel
         </button>
       </div>
 
@@ -152,7 +157,7 @@ function MaterialPicker({ materials, selectedIds, onSelect, onClose }: MaterialP
               : 'bg-white text-ink-600 border-line hover:bg-sand-50',
           ].join(' ')}
         >
-          Semua
+          All
         </button>
         {categories.map(cat => (
           <button
@@ -174,7 +179,7 @@ function MaterialPicker({ materials, selectedIds, onSelect, onClose }: MaterialP
       <div className="flex-1 overflow-y-auto divide-y divide-line">
         {filtered.length === 0 ? (
           <div className="flex items-center justify-center py-16 text-ink-400 text-sm">
-            Bahan tidak ditemukan
+            No ingredients found
           </div>
         ) : (
           filtered.map(m => {
@@ -185,7 +190,6 @@ function MaterialPicker({ materials, selectedIds, onSelect, onClose }: MaterialP
                 onClick={() => { onSelect(m); onClose() }}
                 className="w-full text-left px-4 py-3.5 flex items-center gap-3 hover:bg-sand-50 active:bg-sand-100 transition-colors"
               >
-                {/* Checkmark or spacer */}
                 <span className="w-5 h-5 flex-shrink-0 flex items-center justify-center">
                   {alreadyAdded && (
                     <svg className="w-4 h-4 text-pine" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -208,7 +212,7 @@ function MaterialPicker({ materials, selectedIds, onSelect, onClose }: MaterialP
         )}
         {filtered.length === 50 && (
           <p className="px-4 py-3 text-xs text-ink-400 text-center">
-            Menampilkan 50 hasil pertama — ketik lebih spesifik untuk menyempurnakan pencarian
+            Showing first 50 results — type more to narrow down
           </p>
         )}
       </div>
@@ -216,11 +220,58 @@ function MaterialPicker({ materials, selectedIds, onSelect, onClose }: MaterialP
   )
 }
 
+// ── Draft persistence ─────────────────────────────────────────────────────────
+
+const DRAFT_KEY = 'workshop_formulation_draft'
+
+interface DraftData {
+  savedAt:       number
+  step:          'info' | 'formulation'
+  name:          string
+  phone:         string
+  social:        string
+  perfumeName:   string
+  theme:         string
+  notes:         string
+  selectedSlotId: string
+  items:         FormulationItem[]
+}
+
+function loadDraft(): DraftData | null {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY)
+    if (!raw) return null
+    const d = JSON.parse(raw) as DraftData
+    // Discard drafts older than 24 hours
+    if (Date.now() - d.savedAt > 24 * 60 * 60 * 1000) {
+      localStorage.removeItem(DRAFT_KEY)
+      return null
+    }
+    return d
+  } catch {
+    return null
+  }
+}
+
+function saveDraft(d: DraftData) {
+  try { localStorage.setItem(DRAFT_KEY, JSON.stringify(d)) } catch { /* quota exceeded — ignore */ }
+}
+
+function clearDraft() {
+  try { localStorage.removeItem(DRAFT_KEY) } catch { /* ignore */ }
+}
+
+function timeAgo(ts: number) {
+  const mins = Math.floor((Date.now() - ts) / 60000)
+  if (mins < 1)  return 'just now'
+  if (mins < 60) return `${mins} min ago`
+  return `${Math.floor(mins / 60)} hr ago`
+}
+
 // ── WorkshopFormClient ────────────────────────────────────────────────────────
 
 interface Props {
-  slotId:   string | null
-  slotInfo: SlotInfo | null
+  initialSlotId: string | null
 }
 
 type Step = 'info' | 'formulation'
@@ -228,32 +279,43 @@ type Step = 'info' | 'formulation'
 const INPUT_CLS =
   'w-full rounded-xl px-4 py-3.5 text-sm border outline-none focus:ring-2 focus:ring-pine-200 focus:border-pine border-line text-ink-900 bg-white placeholder:text-ink-300'
 
-export function WorkshopFormClient({ slotId, slotInfo }: Props) {
+const SELECT_CLS =
+  'w-full rounded-xl px-4 py-3.5 text-sm border outline-none focus:ring-2 focus:ring-pine-200 focus:border-pine border-line text-ink-900 bg-white'
+
+export function WorkshopFormClient({ initialSlotId }: Props) {
   const router = useRouter()
 
-  // Step
   const [step, setStep] = useState<Step>('info')
 
   // Customer info
-  const [name,       setName]       = useState('')
-  const [phone,      setPhone]      = useState('')
-  const [social,     setSocial]     = useState('')
+  const [name,        setName]        = useState('')
+  const [phone,       setPhone]       = useState('')
+  const [social,      setSocial]      = useState('')
   const [perfumeName, setPerfumeName] = useState('')
-  const [theme,      setTheme]      = useState('')
-  const [notes,      setNotes]      = useState('')
+  const [theme,       setTheme]       = useState('')
+  const [notes,       setNotes]       = useState('')
+
+  // Slot selection
+  const [slots,          setSlots]          = useState<SlotOption[]>([])
+  const [slotsLoading,   setSlotsLoading]   = useState(true)
+  const [selectedSlotId, setSelectedSlotId] = useState<string>(initialSlotId ?? '')
 
   // Materials
-  const [materials,      setMaterials]      = useState<WorkshopMaterial[]>([])
+  const [materials,        setMaterials]        = useState<WorkshopMaterial[]>([])
   const [materialsLoading, setMaterialsLoading] = useState(false)
   const [materialsError,   setMaterialsError]   = useState('')
 
   // Formulation items
-  const [items,       setItems]       = useState<FormulationItem[]>([])
-  const [showPicker,  setShowPicker]  = useState(false)
+  const [items,      setItems]      = useState<FormulationItem[]>([])
+  const [showPicker, setShowPicker] = useState(false)
 
-  // Submit state
+  // Submit
   const [submitting,  setSubmitting]  = useState(false)
   const [submitError, setSubmitError] = useState('')
+
+  // Draft state
+  const [hasDraft,   setHasDraft]   = useState(false)
+  const [draftSavedAt, setDraftSavedAt] = useState<number | null>(null)
 
   const nameId        = useId()
   const phoneId       = useId()
@@ -261,6 +323,72 @@ export function WorkshopFormClient({ slotId, slotInfo }: Props) {
   const perfumeNameId = useId()
   const themeId       = useId()
   const notesId       = useId()
+  const slotId_       = useId()
+
+  // Check for existing draft on mount
+  useEffect(() => {
+    const draft = loadDraft()
+    if (draft && (draft.name || draft.items.length > 0)) {
+      setHasDraft(true)
+      setDraftSavedAt(draft.savedAt)
+    }
+  }, [])
+
+  function resumeDraft() {
+    const draft = loadDraft()
+    if (!draft) return
+    setStep(draft.step)
+    setName(draft.name)
+    setPhone(draft.phone)
+    setSocial(draft.social)
+    setPerfumeName(draft.perfumeName)
+    setTheme(draft.theme)
+    setNotes(draft.notes)
+    setSelectedSlotId(draft.selectedSlotId || initialSlotId || '')
+    setItems(draft.items)
+    setHasDraft(false)
+  }
+
+  function discardDraft() {
+    clearDraft()
+    setHasDraft(false)
+  }
+
+  // Auto-save draft on any form change (debounced 800ms)
+  const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => {
+    if (hasDraft) return // don't overwrite while showing resume prompt
+    if (draftTimerRef.current) clearTimeout(draftTimerRef.current)
+    draftTimerRef.current = setTimeout(() => {
+      const isEmpty = !name && !phone && !social && !perfumeName && !theme && !notes && items.length === 0
+      if (isEmpty) return
+      const now = Date.now()
+      saveDraft({ savedAt: now, step, name, phone, social, perfumeName, theme, notes, selectedSlotId, items })
+      setDraftSavedAt(now)
+    }, 800)
+    return () => { if (draftTimerRef.current) clearTimeout(draftTimerRef.current) }
+  }, [step, name, phone, social, perfumeName, theme, notes, selectedSlotId, items, hasDraft])
+
+  // Fetch today's slots on mount
+  const fetchSlots = useCallback(async () => {
+    setSlotsLoading(true)
+    try {
+      const today = new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10)
+      const res  = await fetch(`/api/v1/public/workshop/slots?date=${today}`)
+      const json = await res.json()
+      const list: SlotOption[] = json.data ?? []
+      setSlots(list)
+      if (!initialSlotId && list.length === 1) {
+        setSelectedSlotId(list[0].id)
+      }
+    } catch {
+      // silent — slot selection is optional
+    } finally {
+      setSlotsLoading(false)
+    }
+  }, [initialSlotId])
+
+  useEffect(() => { fetchSlots() }, [fetchSlots])
 
   // Fetch materials once
   useEffect(() => {
@@ -270,48 +398,39 @@ export function WorkshopFormClient({ slotId, slotInfo }: Props) {
     fetch('/api/v1/public/workshop/materials')
       .then(r => r.json())
       .then(j => setMaterials(j.data ?? []))
-      .catch(() => setMaterialsError('Gagal memuat daftar bahan. Coba muat ulang halaman.'))
+      .catch(() => setMaterialsError('Failed to load ingredients. Please reload the page.'))
       .finally(() => setMaterialsLoading(false))
   }, [materials.length])
 
-  // Material lookup map
   const materialMap = useMemo(() => {
     const m = new Map<string, WorkshopMaterial>()
     materials.forEach(mat => m.set(mat.id, mat))
     return m
   }, [materials])
 
-  // Set of already-selected material IDs (for checkmarks in picker)
   const selectedMaterialIds = useMemo(
     () => new Set(items.map(i => i.material_id)),
     [items],
   )
 
-  // Total grams
-  const totalGrams = useMemo(
+  const totalGrams     = useMemo(
     () => items.reduce((sum, item) => sum + (typeof item.grams === 'number' ? item.grams : 0), 0),
     [items],
   )
-
   const remainingGrams = 25 - totalGrams
-  const isOver  = totalGrams > 25
-  const isNear  = !isOver && totalGrams >= 20
-  const barPct  = Math.min((totalGrams / 25) * 100, 100)
+  const isOver         = totalGrams > 25
+  const isNear         = !isOver && totalGrams >= 20
+  const barPct         = Math.min((totalGrams / 25) * 100, 100)
+  const barColorClass  = isOver ? 'bg-danger' : isNear ? 'bg-amber-400' : 'bg-pine'
+  const textColorClass = isOver ? 'text-danger' : isNear ? 'text-amber-600' : 'text-ink-900'
 
-  const barColorClass  = isOver ? 'bg-danger'   : isNear ? 'bg-amber-400' : 'bg-pine'
-  const textColorClass = isOver ? 'text-danger'  : isNear ? 'text-amber-600' : 'text-ink-900'
-
-  // Validation
-  const hasEmptyGrams   = items.some(i => i.grams === '')
-  const canSubmit       = items.length > 0 && !isOver && !hasEmptyGrams
-
-  // Step 1 validation
-  const canProceed = name.trim() !== '' && perfumeName.trim() !== ''
+  const canSubmit  = items.length > 0
+  const canProceed = name.trim() !== '' && perfumeName.trim() !== '' && phone.trim() !== ''
 
   function handleAddMaterial(material: WorkshopMaterial) {
     setItems(prev => [
       ...prev,
-      { _key: nextKey(), material_id: material.id, drops: '', grams: '', adj: '' },
+      { _key: nextKey(), material_id: material.id, drops: 0, grams: '', adj: '' },
     ])
   }
 
@@ -320,9 +439,7 @@ export function WorkshopFormClient({ slotId, slotInfo }: Props) {
   }
 
   function handleUpdateItem(key: string, field: 'drops' | 'grams' | 'adj', value: number | '') {
-    setItems(prev =>
-      prev.map(i => i._key === key ? { ...i, [field]: value } : i),
-    )
+    setItems(prev => prev.map(i => i._key === key ? { ...i, [field]: value } : i))
   }
 
   function parseNumInput(raw: string): number | '' {
@@ -336,18 +453,18 @@ export function WorkshopFormClient({ slotId, slotInfo }: Props) {
     setSubmitting(true)
 
     const payload = {
-      slot_id:       slotId ?? undefined,
+      slot_id:         selectedSlotId || undefined,
       customer_name:   name.trim(),
-      customer_phone:  phone.trim() || undefined,
+      customer_phone:  phone.trim()  || undefined,
       customer_social: social.trim() || undefined,
       perfume_name:    perfumeName.trim(),
-      theme:           theme.trim() || undefined,
-      notes:           notes.trim() || undefined,
+      theme:           theme.trim()  || undefined,
+      notes:           notes.trim()  || undefined,
       items: items.map(({ material_id, drops, grams, adj }) => ({
         material_id,
-        drops: drops === '' ? null : drops,
-        grams: grams as number,
-        adj:   adj   === '' ? null : adj,
+        drops: typeof drops === 'number' ? drops : 0,
+        grams: typeof grams === 'number' ? grams : 0,
+        adj:   typeof adj === 'number' ? adj : null,
       })),
     }
 
@@ -359,60 +476,111 @@ export function WorkshopFormClient({ slotId, slotInfo }: Props) {
       })
       const json = await res.json()
       if (!res.ok) {
-        setSubmitError(json.error?.message ?? 'Gagal menyimpan formulasi. Coba lagi.')
+        setSubmitError(json.error?.message ?? json.error ?? 'Failed to save formulation. Please try again.')
         return
       }
+      clearDraft()
       router.push(`/workshop/result/${json.data.access_token}`)
     } catch {
-      setSubmitError('Koneksi gagal. Periksa internet kamu dan coba lagi.')
+      setSubmitError('Connection failed. Check your internet and try again.')
     } finally {
       setSubmitting(false)
     }
   }
 
-  // ── Render: Step 1 ─────────────────────────────────────────────────────────
+  // ── Step 1: Info ───────────────────────────────────────────────────────────
 
   if (step === 'info') {
     return (
       <div className="flex-1 flex flex-col px-4 py-6 max-w-md mx-auto w-full">
-        {/* Progress */}
-        <div className="flex items-center gap-2 mb-6">
-          <div className="flex items-center gap-1.5">
-            <span className="w-6 h-6 rounded-full bg-pine text-white text-xs font-semibold flex items-center justify-center">1</span>
-            <span className="text-sm font-semibold text-ink-900">Info Kamu</span>
-          </div>
-          <div className="flex-1 h-px bg-line" />
-          <div className="flex items-center gap-1.5">
-            <span className="w-6 h-6 rounded-full bg-sand-200 text-ink-400 text-xs font-semibold flex items-center justify-center">2</span>
-            <span className="text-sm text-ink-400">Racik Parfum</span>
-          </div>
-        </div>
 
-        {/* Slot banner */}
-        {slotInfo && (
-          <div className="mb-4 rounded-xl border border-line bg-white px-4 py-3 flex items-start gap-3">
-            <svg className="w-4 h-4 text-pine mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
-            </svg>
-            <div>
-              <p className="text-sm font-medium text-ink-900">{fmtDate(slotInfo.date)}</p>
-              <p className="text-xs text-ink-500 mt-0.5">{fmtTime(slotInfo.start_time)} – {fmtTime(slotInfo.end_time)}</p>
+        {/* Resume draft banner */}
+        {hasDraft && (
+          <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 space-y-2">
+            <div className="flex items-start gap-2">
+              <svg className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+              </svg>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-amber-800">You have an unfinished formulation</p>
+                <p className="text-xs text-amber-700 mt-0.5">
+                  Saved {draftSavedAt ? timeAgo(draftSavedAt) : ''}. Continue where you left off?
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={resumeDraft}
+                className="flex-1 py-2 rounded-xl bg-amber-500 text-white text-sm font-semibold hover:bg-amber-600 transition-colors"
+              >
+                Continue
+              </button>
+              <button
+                onClick={discardDraft}
+                className="flex-1 py-2 rounded-xl border border-amber-300 text-amber-700 text-sm font-medium hover:bg-amber-100 transition-colors"
+              >
+                Start Fresh
+              </button>
             </div>
           </div>
         )}
 
+        {/* Progress */}
+        <div className="flex items-center gap-2 mb-6">
+          <div className="flex items-center gap-1.5">
+            <span className="w-6 h-6 rounded-full bg-pine text-white text-xs font-semibold flex items-center justify-center">1</span>
+            <span className="text-sm font-semibold text-ink-900 uppercase tracking-wide">YOUR INFO</span>
+          </div>
+          <div className="flex-1 h-px bg-line" />
+          <div className="flex items-center gap-1.5">
+            <span className="w-6 h-6 rounded-full bg-sand-200 text-ink-400 text-xs font-semibold flex items-center justify-center">2</span>
+            <span className="text-sm text-ink-400 uppercase tracking-wide">PERFUME FORMULATION</span>
+          </div>
+        </div>
+
         {/* Form fields */}
         <div className="space-y-4 flex-1">
+
+          {/* Slot selection */}
+          <div>
+            <label htmlFor={slotId_} className="block text-xs font-semibold text-ink-500 mb-1.5 uppercase tracking-wide">
+              Workshop Session
+            </label>
+            {slotsLoading ? (
+              <div className="w-full rounded-xl border border-line bg-sand-100 py-3.5 px-4 text-sm text-ink-400 animate-pulse">
+                Loading sessions...
+              </div>
+            ) : slots.length === 0 ? (
+              <div className="w-full rounded-xl border border-line bg-sand-50 py-3.5 px-4 text-sm text-ink-400">
+                No sessions today
+              </div>
+            ) : (
+              <select
+                id={slotId_}
+                value={selectedSlotId}
+                onChange={e => setSelectedSlotId(e.target.value)}
+                className={SELECT_CLS}
+              >
+                <option value="">— Select a session —</option>
+                {slots.map(slot => (
+                  <option key={slot.id} value={slot.id}>
+                    {fmtSlotLabel(slot)}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+
           <div>
             <label htmlFor={nameId} className="block text-xs font-semibold text-ink-500 mb-1.5 uppercase tracking-wide">
-              Nama Lengkap <span className="text-danger">*</span>
+              Full Name <span className="text-danger">*</span>
             </label>
             <input
               id={nameId}
               type="text"
               value={name}
               onChange={e => setName(e.target.value)}
-              placeholder="Nama kamu"
+              placeholder="Your name"
               autoComplete="name"
               className={INPUT_CLS}
             />
@@ -420,7 +588,7 @@ export function WorkshopFormClient({ slotId, slotInfo }: Props) {
 
           <div>
             <label htmlFor={phoneId} className="block text-xs font-semibold text-ink-500 mb-1.5 uppercase tracking-wide">
-              No. HP / WhatsApp
+                Phone / WhatsApp <span className="text-danger">*</span>
             </label>
             <input
               id={phoneId}
@@ -435,7 +603,7 @@ export function WorkshopFormClient({ slotId, slotInfo }: Props) {
 
           <div>
             <label htmlFor={socialId} className="block text-xs font-semibold text-ink-500 mb-1.5 uppercase tracking-wide">
-              IG / Sosmed
+              IG / Social
             </label>
             <input
               id={socialId}
@@ -450,14 +618,14 @@ export function WorkshopFormClient({ slotId, slotInfo }: Props) {
 
           <div>
             <label htmlFor={perfumeNameId} className="block text-xs font-semibold text-ink-500 mb-1.5 uppercase tracking-wide">
-              Nama Parfum <span className="text-danger">*</span>
+              Perfume Name <span className="text-danger">*</span>
             </label>
             <input
               id={perfumeNameId}
               type="text"
               value={perfumeName}
               onChange={e => setPerfumeName(e.target.value)}
-              placeholder="Beri nama parfummu"
+              placeholder="Name your perfume"
               autoComplete="off"
               className={INPUT_CLS}
             />
@@ -465,14 +633,14 @@ export function WorkshopFormClient({ slotId, slotInfo }: Props) {
 
           <div>
             <label htmlFor={themeId} className="block text-xs font-semibold text-ink-500 mb-1.5 uppercase tracking-wide">
-              Tema Parfum
+              Perfume Theme
             </label>
             <input
               id={themeId}
               type="text"
               value={theme}
               onChange={e => setTheme(e.target.value)}
-              placeholder="Contoh: Fresh & Sporty"
+              placeholder="e.g. Fresh & Sporty"
               autoComplete="off"
               className={INPUT_CLS}
             />
@@ -480,13 +648,13 @@ export function WorkshopFormClient({ slotId, slotInfo }: Props) {
 
           <div>
             <label htmlFor={notesId} className="block text-xs font-semibold text-ink-500 mb-1.5 uppercase tracking-wide">
-              Catatan
+              Notes
             </label>
             <textarea
               id={notesId}
               value={notes}
               onChange={e => setNotes(e.target.value)}
-              placeholder="Ada preferensi atau request khusus? (opsional)"
+              placeholder="Any preferences or special requests? (optional)"
               rows={3}
               className={INPUT_CLS + ' resize-none'}
             />
@@ -500,27 +668,26 @@ export function WorkshopFormClient({ slotId, slotInfo }: Props) {
             disabled={!canProceed}
             className="w-full py-4 rounded-2xl bg-pine text-white text-base font-semibold disabled:opacity-40 hover:bg-pine-700 active:scale-[0.98] transition-all"
           >
-            Lanjut — Racik Parfum
+            Next — Perfume Formulation
           </button>
           {!canProceed && (
-            <p className="text-xs text-ink-400 text-center mt-2">Isi Nama Lengkap dan Nama Parfum dulu ya</p>
+            <p className="text-xs text-ink-400 text-center mt-2">Please fill in Full Name, WhatsApp Number, and Perfume Name first</p>
           )}
         </div>
       </div>
     )
   }
 
-  // ── Render: Step 2 ─────────────────────────────────────────────────────────
+  // ── Step 2: Formulation ────────────────────────────────────────────────────
 
   return (
     <>
       {/* Sticky gram bar */}
       <div className="sticky top-0 z-20 bg-white border-b border-line px-4 py-3">
-        {/* Back + progress */}
         <div className="flex items-center gap-2 mb-2">
           <button
             onClick={() => setStep('info')}
-            aria-label="Kembali ke info peserta"
+            aria-label="Back to your info"
             className="p-1 -ml-1 rounded-md text-ink-400 hover:text-ink-700"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -531,11 +698,10 @@ export function WorkshopFormClient({ slotId, slotInfo }: Props) {
             <span className="w-6 h-6 rounded-full bg-sand-200 text-ink-400 text-xs font-semibold flex items-center justify-center">1</span>
             <div className="w-8 h-px bg-line" />
             <span className="w-6 h-6 rounded-full bg-pine text-white text-xs font-semibold flex items-center justify-center">2</span>
-            <span className="text-sm font-semibold text-ink-900">Racik Parfum</span>
+            <span className="text-sm font-semibold text-ink-900">PERFUME FORMULATION</span>
           </div>
         </div>
 
-        {/* Gram counter */}
         <div className="flex items-center justify-between mb-1.5">
           <span className="text-xs text-ink-500">Total</span>
           <span className={`text-sm font-semibold tabular-nums ${textColorClass}`}>
@@ -548,15 +714,22 @@ export function WorkshopFormClient({ slotId, slotInfo }: Props) {
             style={{ width: `${barPct}%` }}
           />
         </div>
-        {isOver && (
-          <p className="text-xs text-danger mt-1 font-medium">
-            Melebihi batas 25g — kurangi takaran dulu
-          </p>
-        )}
-        {!isOver && (
-          <p className="text-xs text-ink-400 mt-1">
-            Sisa: <span className={`font-medium tabular-nums ${isNear ? 'text-amber-600' : 'text-ink-700'}`}>{formatGram(remainingGrams)}</span>
-          </p>
+        {isOver ? (
+          <p className="text-xs text-danger mt-1 font-medium">Exceeds 25g limit — reduce your amounts</p>
+        ) : (
+          <div className="flex items-center justify-between mt-1">
+            <p className="text-xs text-ink-400">
+              Remaining: <span className={`font-medium tabular-nums ${isNear ? 'text-amber-600' : 'text-ink-700'}`}>{formatGram(remainingGrams)}</span>
+            </p>
+            {draftSavedAt && (
+              <p className="text-[10px] text-ink-300 flex items-center gap-1">
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+                Saved {timeAgo(draftSavedAt)}
+              </p>
+            )}
+          </div>
         )}
       </div>
 
@@ -570,20 +743,15 @@ export function WorkshopFormClient({ slotId, slotInfo }: Props) {
 
         {items.length === 0 && (
           <div className="rounded-2xl border border-dashed border-line bg-white px-6 py-10 text-center">
-            <p className="text-sm text-ink-500">Belum ada bahan dipilih</p>
-            <p className="text-xs text-ink-400 mt-1">Tekan tombol di bawah untuk mulai meracik</p>
+            <p className="text-sm text-ink-500">No ingredients added yet</p>
+            <p className="text-xs text-ink-400 mt-1">Tap the button below to start building your formula</p>
           </div>
         )}
 
         {items.map(item => {
           const material = materialMap.get(item.material_id)
-          const gramsEmpty = item.grams === ''
           return (
-            <div
-              key={item._key}
-              className="bg-white border border-line rounded-2xl p-4 space-y-3"
-            >
-              {/* Material header row */}
+            <div key={item._key} className="bg-white border border-line rounded-2xl p-4 space-y-3">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-ink-900 truncate">
@@ -595,7 +763,7 @@ export function WorkshopFormClient({ slotId, slotInfo }: Props) {
                 </div>
                 <button
                   onClick={() => handleRemoveItem(item._key)}
-                  aria-label="Hapus bahan"
+                  aria-label="Remove ingredient"
                   className="w-7 h-7 rounded-lg border border-line text-ink-400 hover:border-danger-bd hover:text-danger hover:bg-danger-bg transition-colors flex items-center justify-center flex-shrink-0"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -604,51 +772,60 @@ export function WorkshopFormClient({ slotId, slotInfo }: Props) {
                 </button>
               </div>
 
-              {/* Input row */}
-              <div className="grid grid-cols-3 gap-2">
-                {/* Drops */}
-                <div>
-                  <label className="block text-[10px] font-semibold text-ink-400 mb-1 uppercase tracking-wide">
-                    Drops
-                  </label>
+              {/* Drops — stepper */}
+              <div>
+                <label className="block text-[10px] font-semibold text-ink-400 mb-1 uppercase tracking-wide">
+                  Drops <span className="text-danger">*</span>
+                </label>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const cur = typeof item.drops === 'number' ? item.drops : 0
+                      handleUpdateItem(item._key, 'drops', Math.max(0, cur - 1))
+                    }}
+                    className="w-10 h-10 flex-shrink-0 rounded-xl border border-line bg-sand-50 text-ink-700 text-lg font-semibold flex items-center justify-center hover:bg-sand-100 active:scale-95 transition-all"
+                    aria-label="Decrease drops"
+                  >
+                    −
+                  </button>
                   <input
-                    type="number"
-                    min={0}
-                    step={1}
+                    type="number" min={0} step={1}
                     value={item.drops === '' ? '' : item.drops}
                     onChange={e => handleUpdateItem(item._key, 'drops', parseNumInput(e.target.value))}
-                    placeholder="—"
-                    className="w-full rounded-xl px-3 py-2.5 text-sm border border-line outline-none focus:ring-2 focus:ring-pine-200 focus:border-pine text-ink-900 tabular-nums text-center"
+                    placeholder="0"
+                    className="flex-1 rounded-xl px-3 py-2.5 text-sm border border-line outline-none focus:ring-2 focus:ring-pine-200 focus:border-pine text-ink-900 tabular-nums text-center"
                   />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const cur = typeof item.drops === 'number' ? item.drops : 0
+                      handleUpdateItem(item._key, 'drops', cur + 1)
+                    }}
+                    className="w-10 h-10 flex-shrink-0 rounded-xl border border-line bg-sand-50 text-ink-700 text-lg font-semibold flex items-center justify-center hover:bg-sand-100 active:scale-95 transition-all"
+                    aria-label="Increase drops"
+                  >
+                    +
+                  </button>
                 </div>
+              </div>
 
-                {/* Grams (required) */}
+              {/* Grams + Adj — optional */}
+              <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-[10px] font-semibold text-ink-400 mb-1 uppercase tracking-wide">
-                    Grams <span className="text-danger">*</span>
-                  </label>
+                  <label className="block text-[10px] font-semibold text-ink-400 mb-1 uppercase tracking-wide">Grams</label>
                   <input
-                    type="number"
-                    min={0}
-                    step={0.01}
+                    type="number" min={0} step={0.01}
                     value={item.grams === '' ? '' : item.grams}
                     onChange={e => handleUpdateItem(item._key, 'grams', parseNumInput(e.target.value))}
                     placeholder="0.00"
-                    className={[
-                      'w-full rounded-xl px-3 py-2.5 text-sm border outline-none focus:ring-2 focus:ring-pine-200 focus:border-pine text-ink-900 tabular-nums text-center',
-                      gramsEmpty ? 'border-danger bg-danger-bg' : 'border-line',
-                    ].join(' ')}
+                    className="w-full rounded-xl px-3 py-2.5 text-sm border border-line outline-none focus:ring-2 focus:ring-pine-200 focus:border-pine text-ink-900 tabular-nums text-center"
                   />
                 </div>
-
-                {/* Adj */}
                 <div>
-                  <label className="block text-[10px] font-semibold text-ink-400 mb-1 uppercase tracking-wide">
-                    Adj
-                  </label>
+                  <label className="block text-[10px] font-semibold text-ink-400 mb-1 uppercase tracking-wide">Adj</label>
                   <input
-                    type="number"
-                    step={0.01}
+                    type="number" step={0.01}
                     value={item.adj === '' ? '' : item.adj}
                     onChange={e => handleUpdateItem(item._key, 'adj', parseNumInput(e.target.value))}
                     placeholder="—"
@@ -660,7 +837,6 @@ export function WorkshopFormClient({ slotId, slotInfo }: Props) {
           )
         })}
 
-        {/* Add material button */}
         <button
           onClick={() => setShowPicker(true)}
           disabled={materialsLoading}
@@ -669,7 +845,7 @@ export function WorkshopFormClient({ slotId, slotInfo }: Props) {
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
           </svg>
-          {materialsLoading ? 'Memuat bahan...' : '+ Tambah Bahan'}
+          {materialsLoading ? 'Loading ingredients...' : 'Add Ingredient'}
         </button>
       </div>
 
@@ -686,18 +862,14 @@ export function WorkshopFormClient({ slotId, slotInfo }: Props) {
             disabled={!canSubmit || submitting}
             className="w-full py-4 rounded-2xl bg-pine text-white text-base font-semibold disabled:opacity-40 hover:bg-pine-700 active:scale-[0.98] transition-all"
           >
-            {submitting ? 'Menyimpan...' : 'Simpan Formulasi'}
+            {submitting ? 'Saving...' : 'Save Formulation'}
           </button>
           {items.length === 0 && (
-            <p className="text-xs text-ink-400 text-center">Tambahkan minimal 1 bahan dulu</p>
-          )}
-          {hasEmptyGrams && items.length > 0 && (
-            <p className="text-xs text-danger text-center">Isi kolom Grams yang kosong (warna merah)</p>
+            <p className="text-xs text-ink-400 text-center">Add at least 1 ingredient first</p>
           )}
         </div>
       </div>
 
-      {/* Material picker overlay */}
       {showPicker && (
         <MaterialPicker
           materials={materials}

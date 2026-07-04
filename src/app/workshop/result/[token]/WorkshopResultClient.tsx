@@ -29,8 +29,8 @@ interface Props { formulation: FormulationData }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const MONTHS = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des']
-const DAYS   = ['Min','Sen','Sel','Rab','Kam','Jum','Sab']
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+const DAYS   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
 
 function fmtDate(d: string) {
   const dt = new Date(d + 'T00:00:00')
@@ -70,12 +70,12 @@ export function WorkshopResultClient({ formulation: f }: Props) {
       const json = await res.json()
       if (!res.ok) {
         if (res.status === 409) { setStatus('finalized'); return }
-        setError(json.error ?? 'Gagal menyimpan. Coba lagi.')
+        setError(json.error ?? 'Failed to save. Please try again.')
         return
       }
       setStatus('finalized')
     } catch {
-      setError('Koneksi gagal. Coba lagi.')
+      setError('Connection failed. Please try again.')
     } finally {
       setFinalizing(false)
     }
@@ -104,26 +104,26 @@ export function WorkshopResultClient({ formulation: f }: Props) {
         {status === 'finalized' ? (
           <div className="bg-white border border-line rounded-2xl p-4 text-center space-y-1">
             <p className="text-2xl">✅</p>
-            <p className="text-sm font-semibold text-ink-900">Formulasi tersimpan!</p>
-            <p className="text-xs text-ink-500">Simpan link ini untuk akses kembali formulasimu kapan saja.</p>
+            <p className="text-sm font-semibold text-ink-900">Formulation saved!</p>
+            <p className="text-xs text-ink-500">Save this link to access your formulation anytime.</p>
           </div>
         ) : (
           <div className="bg-white border border-amber-200 rounded-2xl p-4 text-center space-y-1">
-            <p className="text-sm font-medium text-amber-700">Formulasi belum dikonfirmasi</p>
-            <p className="text-xs text-ink-500">Periksa bahan di bawah lalu klik Konfirmasi untuk menyimpan.</p>
+            <p className="text-sm font-medium text-amber-700">Formulation not yet confirmed</p>
+            <p className="text-xs text-ink-500">Review your ingredients below and tap Confirm to save.</p>
           </div>
         )}
 
-        {/* Info peserta */}
+        {/* Participant info */}
         <div className="bg-white border border-line rounded-2xl p-4 space-y-3">
           <div className="flex items-start justify-between gap-2">
             <div>
-              <p className="text-xs text-ink-500">Nama Peserta</p>
+              <p className="text-xs text-ink-500">Participant</p>
               <p className="text-base font-semibold text-ink-900">{f.customers?.name ?? '—'}</p>
             </div>
             {f.contact_socmed && (
               <div className="text-right">
-                <p className="text-xs text-ink-500">Sosmed</p>
+                <p className="text-xs text-ink-500">Social</p>
                 <p className="text-sm text-ink-900">{f.contact_socmed}</p>
               </div>
             )}
@@ -131,7 +131,7 @@ export function WorkshopResultClient({ formulation: f }: Props) {
 
           {f.consultation_slots && (
             <div className="pt-2 border-t border-line">
-              <p className="text-xs text-ink-500 mb-0.5">Sesi Workshop</p>
+              <p className="text-xs text-ink-500 mb-0.5">Workshop Session</p>
               <p className="text-sm font-medium text-ink-900">
                 {fmtDate(f.consultation_slots.date)} · {fmtTime(f.consultation_slots.start_time)} – {fmtTime(f.consultation_slots.end_time)}
               </p>
@@ -139,46 +139,45 @@ export function WorkshopResultClient({ formulation: f }: Props) {
           )}
         </div>
 
-        {/* Parfum info */}
+        {/* Perfume info */}
         <div className="bg-white border border-line rounded-2xl p-4 space-y-2">
           {f.perfume_name && (
             <div>
-              <p className="text-xs text-ink-500">Nama Parfum</p>
+              <p className="text-xs text-ink-500">Perfume Name</p>
               <p className="text-xl font-bold text-ink-900">✨ {f.perfume_name}</p>
             </div>
           )}
           {f.theme && (
             <div>
-              <p className="text-xs text-ink-500">Tema</p>
+              <p className="text-xs text-ink-500">Theme</p>
               <p className="text-sm text-ink-900">{f.theme}</p>
             </div>
           )}
           {f.notes && (
             <div className="pt-2 border-t border-line">
-              <p className="text-xs text-ink-500 mb-0.5">Catatan</p>
+              <p className="text-xs text-ink-500 mb-0.5">Notes</p>
               <p className="text-sm text-ink-900 whitespace-pre-wrap">{f.notes}</p>
             </div>
           )}
         </div>
 
-        {/* Tabel bahan */}
+        {/* Ingredient table */}
         <div className="bg-white border border-line rounded-2xl overflow-hidden">
-          <div className="px-4 py-3 border-b border-line flex items-center justify-between">
-            <p className="text-sm font-semibold text-ink-900">Formulasi Bahan</p>
-            <span className="text-sm font-semibold tabular-nums text-pine">{fmtGram(totalGrams)} / 25g</span>
+          <div className="px-4 py-3 border-b border-line flex items-center justify-between gap-2">
+            <p className="text-sm font-semibold text-ink-900">Ingredient Formulation</p>
+            <span className="text-xs text-ink-500 tabular-nums">{fmtGram(totalGrams)} / 25g</span>
           </div>
 
-          {/* Header tabel */}
           <div className="grid grid-cols-[2rem_1fr_auto_auto_auto] gap-x-3 px-4 py-2 bg-sand-50 text-xs text-ink-500 font-medium border-b border-line">
             <span>#</span>
-            <span>Bahan</span>
+            <span>Ingredient</span>
             <span className="text-right w-12">Drops</span>
             <span className="text-right w-12">Grams</span>
             <span className="text-right w-10">Adj</span>
           </div>
 
           {items.length === 0 ? (
-            <p className="px-4 py-6 text-center text-sm text-ink-400">Belum ada bahan.</p>
+            <p className="px-4 py-6 text-center text-sm text-ink-400">No ingredients yet.</p>
           ) : (
             items.map(item => {
               const mat = item.workshop_materials
@@ -196,16 +195,20 @@ export function WorkshopResultClient({ formulation: f }: Props) {
                     </div>
                   </div>
                   <span className="text-sm tabular-nums text-ink-700 text-right w-12 pt-0.5">{item.drops ?? '—'}</span>
-                  <span className="text-sm tabular-nums font-medium text-ink-900 text-right w-12 pt-0.5">{fmtGram(Number(item.grams))}</span>
+                  <span className="text-sm tabular-nums text-ink-700 text-right w-12 pt-0.5">{item.grams ? fmtGram(item.grams) : '—'}</span>
                   <span className="text-sm tabular-nums text-ink-500 text-right w-10 pt-0.5">{item.adj != null ? item.adj : '—'}</span>
                 </div>
               )
             })
           )}
 
-          <div className="px-4 py-3 bg-sand-50 flex justify-between items-center">
-            <span className="text-xs font-medium text-ink-500">Total</span>
-            <span className="text-base font-bold tabular-nums text-ink-900">{fmtGram(totalGrams)}</span>
+          {/* Total grams footer */}
+          <div className="grid grid-cols-[2rem_1fr_auto_auto_auto] gap-x-3 px-4 py-3 border-t border-line bg-sand-50">
+            <span />
+            <span className="text-xs font-semibold text-ink-700">Total</span>
+            <span className="w-12" />
+            <span className="text-sm font-semibold tabular-nums text-ink-900 text-right w-12">{fmtGram(totalGrams)}</span>
+            <span className="w-10" />
           </div>
         </div>
 
@@ -223,7 +226,7 @@ export function WorkshopResultClient({ formulation: f }: Props) {
               className="w-full py-4 rounded-2xl bg-pine text-white text-base font-semibold hover:bg-pine-700 disabled:opacity-45 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
             >
               {finalizing && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
-              ✅ Konfirmasi &amp; Simpan Formulasi
+              ✅ Confirm &amp; Save Formulation
             </button>
           )}
 
@@ -231,7 +234,7 @@ export function WorkshopResultClient({ formulation: f }: Props) {
             onClick={handleCopy}
             className="w-full py-3 rounded-2xl border border-line bg-white text-sm font-medium text-ink-700 hover:bg-sand-50 active:scale-[0.98] transition-all"
           >
-            {copied ? '✓ Link disalin!' : '🔗 Salin Link Hasil'}
+            {copied ? '✓ Link copied!' : '🔗 Copy Result Link'}
           </button>
         </div>
       </div>
