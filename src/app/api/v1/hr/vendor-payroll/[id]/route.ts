@@ -23,7 +23,9 @@ export async function GET(
   const { id } = await params
   if (!UUID_RE.test(id)) return NextResponse.json({ error: 'id tidak valid.' }, { status: 400 })
 
-  const { data, error } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = supabase as any
+  const { data, error } = await db
     .from('vendor_payroll_runs')
     .select(`
       *,
@@ -65,16 +67,18 @@ export async function PATCH(
   if (!body.status || !['finalized', 'paid'].includes(body.status))
     return NextResponse.json({ error: "status harus 'finalized' atau 'paid'." }, { status: 400 })
 
-  const { data: existing } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = supabase as any
+
+  const { data: existing } = await db
     .from('vendor_payroll_runs').select('id, status').eq('id', id).single()
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   if (body.status === 'finalized') {
-    // Delegate ke Postgres function
-    const { error: rpcErr } = await supabase.rpc('finalize_vendor_payroll_run', { p_run_id: id })
+    const { error: rpcErr } = await db.rpc('finalize_vendor_payroll_run', { p_run_id: id })
     if (rpcErr) return NextResponse.json({ error: rpcErr.message }, { status: 500 })
 
-    const { data: updated, error: fetchErr } = await supabase
+    const { data: updated, error: fetchErr } = await db
       .from('vendor_payroll_runs').select('*').eq('id', id).single()
     if (fetchErr) return NextResponse.json({ error: fetchErr.message }, { status: 500 })
 
@@ -85,7 +89,7 @@ export async function PATCH(
   if (existing.status !== 'finalized')
     return NextResponse.json({ error: 'Run harus berstatus finalized sebelum bisa dibayar.' }, { status: 400 })
 
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('vendor_payroll_runs')
     .update({ status: 'paid' })
     .eq('id', id)

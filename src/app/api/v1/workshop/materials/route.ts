@@ -10,7 +10,6 @@ type RawCategory = {
 
 // GET /api/v1/workshop/materials
 // List semua bahan workshop (termasuk stok). Manager only.
-// Order: kategori sort_order ASC, lalu nama ASC.
 export async function GET() {
   const supabase = await createClient()
   const { data: { user }, error: authErr } = await supabase.auth.getUser()
@@ -26,7 +25,9 @@ export async function GET() {
   if (!['owner', 'admin'].includes(staff.role))
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const { data, error } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = supabase as any
+  const { data, error } = await db
     .from('workshop_materials')
     .select(`
       id, branch_id, name, dilution_percentage, category_id,
@@ -37,9 +38,10 @@ export async function GET() {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  const sorted = (data ?? []).sort((a, b) => {
-    const aCat = a.scent_categories as unknown as RawCategory
-    const bCat = b.scent_categories as unknown as RawCategory
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sorted = (data ?? []).sort((a: any, b: any) => {
+    const aCat = a.scent_categories as RawCategory
+    const bCat = b.scent_categories as RawCategory
     const aOrder = aCat?.sort_order ?? 9999
     const bOrder = bCat?.sort_order ?? 9999
     if (aOrder !== bOrder) return aOrder - bOrder

@@ -5,7 +5,6 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 // GET /api/v1/hr/vendors?branch_id=<uuid>
 // List vendors. Manager only.
-// Manager tanpa branch_id param → semua vendor. Non-manager selalu dibatasi ke branch_id sendiri.
 export async function GET(request: Request) {
   const supabase = await createClient()
   const { data: { user }, error: authErr } = await supabase.auth.getUser()
@@ -21,15 +20,14 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const branchParam = searchParams.get('branch_id')
 
-  // Non-null branch param must be valid UUID
   if (branchParam && !UUID_RE.test(branchParam))
     return NextResponse.json({ error: 'branch_id harus UUID valid.' }, { status: 400 })
 
-  // Effective branch: explicit param > staff branch (for non-owner admins)
-  // Owner with no param → no branch filter (lintas cabang)
   const effectiveBranch = branchParam ?? (staff.role !== 'owner' ? staff.branch_id : null)
 
-  let query = supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = supabase as any
+  let query = db
     .from('vendors')
     .select('id, branch_id, name, phone, bank_account, notes, is_active, created_at, updated_at, branch:branch_id(id, name)')
     .order('name', { ascending: true })
@@ -72,7 +70,9 @@ export async function POST(request: Request) {
   if (!branchId || !UUID_RE.test(branchId))
     return NextResponse.json({ error: 'branch_id wajib dan harus UUID valid.' }, { status: 400 })
 
-  const { data, error } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = supabase as any
+  const { data, error } = await db
     .from('vendors')
     .insert({
       name: body.name.trim(),

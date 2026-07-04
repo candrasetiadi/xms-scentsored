@@ -57,8 +57,10 @@ export async function POST(request: Request) {
     )
 
   const admin = createAdminClient()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = admin as any
 
-  const { data, error } = await admin.rpc('submit_workshop_formulation', {
+  const { data, error } = await db.rpc('submit_workshop_formulation', {
     p_customer_name:  body.customer_name.trim(),
     p_customer_phone: body.customer_phone ?? null,
     p_customer_email: body.customer_email ?? null,

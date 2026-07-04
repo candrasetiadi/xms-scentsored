@@ -31,10 +31,11 @@ export async function GET(request: Request) {
   if (statusParam && !VALID_STATUSES.includes(statusParam as RunStatus))
     return NextResponse.json({ error: `status harus salah satu dari: ${VALID_STATUSES.join(', ')}.` }, { status: 400 })
 
-  // Owner dengan branch_id null dan tanpa param → semua cabang
   const effectiveBranch = branchParam ?? (staff.role !== 'owner' ? staff.branch_id : null)
 
-  let query = supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = supabase as any
+  let query = db
     .from('vendor_payroll_runs')
     .select('*, branch:branch_id(id, name)')
     .order('period_year', { ascending: false })
@@ -79,7 +80,9 @@ export async function POST(request: Request) {
   if (!body.period_year || body.period_year < 2000 || body.period_year > 2100)
     return NextResponse.json({ error: 'period_year wajib (2000-2100).' }, { status: 400 })
 
-  const { data, error } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = supabase as any
+  const { data, error } = await db
     .from('vendor_payroll_runs')
     .insert({
       branch_id: branchId,

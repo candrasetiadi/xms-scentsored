@@ -44,5 +44,6 @@ export default async function WorkshopResultPage({ params }: Props) {
     )
   }
 
-  return <WorkshopResultClient formulation={data as Parameters<typeof WorkshopResultClient>[0]['formulation']} />
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return <WorkshopResultClient formulation={data as unknown as Parameters<typeof WorkshopResultClient>[0]['formulation']} />
 }

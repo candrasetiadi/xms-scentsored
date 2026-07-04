@@ -29,11 +29,15 @@ export async function PATCH(
   if (body.tax_amount == null || typeof body.tax_amount !== 'number' || !Number.isFinite(body.tax_amount) || body.tax_amount < 0)
     return NextResponse.json({ error: 'tax_amount wajib dan harus angka >= 0.' }, { status: 400 })
 
+  type PayslipRow = {
+    status: string; gross: number; total_allowances: number
+    total_deductions: number; overtime_amount: number; sales_fee_amount: number
+  }
   const { data: existing } = await supabase
     .from('payslips')
     .select('status, gross, total_allowances, total_deductions, overtime_amount, sales_fee_amount')
     .eq('id', id)
-    .single()
+    .single() as unknown as { data: PayslipRow | null; error: unknown }
 
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   if (existing.status !== 'draft')

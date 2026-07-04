@@ -17,8 +17,10 @@ export async function POST(
     return NextResponse.json({ error: 'Token tidak valid.' }, { status: 400 })
 
   const admin = createAdminClient()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = admin as any
 
-  const { error } = await admin.rpc('finalize_workshop_formulation', {
+  const { error } = await db.rpc('finalize_workshop_formulation', {
     p_access_token: token,
   })
 

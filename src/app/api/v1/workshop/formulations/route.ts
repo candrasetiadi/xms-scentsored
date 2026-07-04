@@ -9,7 +9,6 @@ type RawItem     = { id: string }
 
 // GET /api/v1/workshop/formulations
 // List semua formulasi. Manager only.
-// Query params: slot_id, branch_id, status, date (YYYY-MM-DD filter pada created_at)
 export async function GET(request: Request) {
   const supabase = await createClient()
   const { data: { user }, error: authErr } = await supabase.auth.getUser()
@@ -38,7 +37,9 @@ export async function GET(request: Request) {
   if (dateParam && !/^\d{4}-\d{2}-\d{2}$/.test(dateParam))
     return NextResponse.json({ error: 'date harus format YYYY-MM-DD.' }, { status: 400 })
 
-  let query = supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = supabase as any
+  let query = db
     .from('workshop_formulations')
     .select(`
       id, access_token, perfume_name, status, total_grams, created_at,
@@ -60,16 +61,16 @@ export async function GET(request: Request) {
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  const result = (data ?? []).map(f => ({
+  const result = (data ?? []).map((f: any) => ({
     id:           f.id,
     access_token: f.access_token,
     perfume_name: f.perfume_name,
     status:       f.status,
     total_grams:  f.total_grams,
     created_at:   f.created_at,
-    customer:     (f.customers         as unknown as RawCustomer) ?? null,
-    slot:         (f.consultation_slots as unknown as RawSlot)    ?? null,
-    item_count:   ((f.workshop_formulation_items as unknown as RawItem[]) ?? []).length,
+    customer:     (f.customers         as RawCustomer) ?? null,
+    slot:         (f.consultation_slots as RawSlot)    ?? null,
+    item_count:   ((f.workshop_formulation_items as RawItem[]) ?? []).length,
   }))
 
   return NextResponse.json({ data: result })

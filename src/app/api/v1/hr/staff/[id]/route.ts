@@ -80,9 +80,11 @@ export async function PATCH(
 
   const { data, error } = await supabase
     .from('staff')
-    .update(updates)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .update(updates as any)
     .eq('id', id)
-    .select('id, name, role, branch_id, active, sales_fee_pct, created_at, updated_at')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .select('id, name, role, branch_id, active, sales_fee_pct, created_at, updated_at' as any)
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

@@ -74,13 +74,14 @@ export async function PUT(request: Request) {
 
   const { data, error } = await supabase
     .from('hr_settings')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .upsert(
       {
         branch_id: branchId,
         ...(body.late_tolerance_minutes != null ? { late_tolerance_minutes: body.late_tolerance_minutes } : {}),
         ...(body.overtime_rate_per_hour != null ? { overtime_rate_per_hour: body.overtime_rate_per_hour } : {}),
         ...(body.vendor_fee_per_tx != null ? { vendor_fee_per_tx: body.vendor_fee_per_tx } : {}),
-      },
+      } as any,
       { onConflict: 'branch_id' }
     )
     .select()
