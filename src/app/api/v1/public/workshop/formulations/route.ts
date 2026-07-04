@@ -1,13 +1,11 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 
-const MAX_TOTAL_GRAMS = 25
+const DEFAULT_TARGET_GRAMS = 30
 
 interface FormulationItem {
   material_id: string
   drops?: number
-  grams: number
-  adj?: number
 }
 
 interface FormulationBody {
@@ -21,40 +19,37 @@ interface FormulationBody {
   notes?: string
   slot_id?: string
   branch_id?: string
+  target_grams?: number
   items?: FormulationItem[]
 }
 
 // POST /api/v1/public/workshop/formulations
-// Buat formulasi baru via halaman publik. Tidak memerlukan auth.
-// Body: { customer_name, customer_phone?, customer_email?, contact_socmed?,
-//         perfume_name?, theme?, notes?, slot_id?, branch_id?,
-//         items: [{ material_id, drops?, grams, adj? }] }
+// Body: { customer_name, customer_phone?, contact_socmed?,
+//         perfume_name?, theme?, notes?, slot_id?, target_grams?,
+//         items: [{ material_id, drops }] }
 // Response 201: { data: { formulation_id, access_token, result_url } }
 export async function POST(request: Request) {
   let body: FormulationBody
   try {
     body = await request.json() as FormulationBody
   } catch {
-    return NextResponse.json({ error: 'Body tidak valid.' }, { status: 400 })
+    return NextResponse.json({ error: 'Invalid request body.' }, { status: 400 })
   }
 
   if (!body.customer_name?.trim())
-    return NextResponse.json({ error: 'customer_name wajib diisi.' }, { status: 400 })
+    return NextResponse.json({ error: 'customer_name is required.' }, { status: 400 })
 
   if (!Array.isArray(body.items) || body.items.length < 1)
-    return NextResponse.json({ error: 'items harus berisi minimal 1 bahan.' }, { status: 400 })
+    return NextResponse.json({ error: 'items must contain at least 1 ingredient.' }, { status: 400 })
 
-  for (const item of body.items) {
-    if (typeof item.grams !== 'number' || item.grams < 0)
-      return NextResponse.json({ error: 'Setiap item harus memiliki grams >= 0.' }, { status: 400 })
-  }
+  if (!body.items.every(i => i.material_id?.trim()))
+    return NextResponse.json({ error: 'Each item must have a material_id.' }, { status: 400 })
 
-  const totalGrams = body.items.reduce((sum, item) => sum + item.grams, 0)
-  if (totalGrams > MAX_TOTAL_GRAMS)
-    return NextResponse.json(
-      { error: `Total grams tidak boleh melebihi ${MAX_TOTAL_GRAMS}g. Total saat ini: ${totalGrams}g.` },
-      { status: 400 },
-    )
+  const targetGrams = typeof body.target_grams === 'number'
+    && body.target_grams > 0
+    && body.target_grams <= 500
+    ? body.target_grams
+    : DEFAULT_TARGET_GRAMS
 
   const admin = createAdminClient()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -70,6 +65,7 @@ export async function POST(request: Request) {
     p_notes:          body.notes          ?? null,
     p_slot_id:        body.slot_id        ?? null,
     p_branch_id:      body.branch_id      ?? null,
+    p_target_grams:   targetGrams,
     p_items:          body.items,
   })
 

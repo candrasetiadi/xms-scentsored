@@ -6,9 +6,9 @@ import { useState, useCallback } from 'react'
 
 interface ScentCategory { id: string; name: string; color_hex: string }
 interface Material { id: string; name: string; dilution_percentage: number | null; scent_categories: ScentCategory | null }
-interface Item { id: string; line_no: number; drops: number | null; grams: number; adj: number | null; workshop_materials: Material | null }
+interface Item { id: string; line_no: number; drops: number | null; grams: number; workshop_materials: Material | null }
 interface Slot { date: string; start_time: string; end_time: string }
-interface Customer { name: string; phone: string | null; email: string | null }
+interface Customer { name: string }
 
 export interface FormulationData {
   id: string
@@ -17,6 +17,7 @@ export interface FormulationData {
   theme: string | null
   contact_socmed: string | null
   notes: string | null
+  target_grams: number
   total_grams: number
   status: 'draft' | 'finalized'
   created_at: string
@@ -59,8 +60,8 @@ export function WorkshopResultClient({ formulation: f }: Props) {
   const [copied,     setCopied]     = useState(false)
   const [error,      setError]      = useState('')
 
-  const items = [...(f.workshop_formulation_items ?? [])].sort((a, b) => a.line_no - b.line_no)
-  const totalGrams = items.reduce((s, i) => s + Number(i.grams ?? 0), 0)
+  const items      = [...(f.workshop_formulation_items ?? [])].sort((a, b) => a.line_no - b.line_no)
+  const totalGrams = f.total_grams  // authoritative value from DB; avoids float rounding artefacts
 
   const handleFinalize = useCallback(async () => {
     setFinalizing(true)
@@ -86,14 +87,11 @@ export function WorkshopResultClient({ formulation: f }: Props) {
       await navigator.clipboard.writeText(window.location.href)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
-    } catch {
-      // fallback: select text
-    }
+    } catch { /* ignore */ }
   }
 
   return (
     <div className="min-h-screen bg-sand-50">
-      {/* Header brand */}
       <div className="bg-white border-b border-line px-4 py-3 text-center">
         <span className="text-sm font-bold tracking-widest text-ink-900 uppercase">Scentsored</span>
       </div>
@@ -128,7 +126,6 @@ export function WorkshopResultClient({ formulation: f }: Props) {
               </div>
             )}
           </div>
-
           {f.consultation_slots && (
             <div className="pt-2 border-t border-line">
               <p className="text-xs text-ink-500 mb-0.5">Workshop Session</p>
@@ -165,15 +162,14 @@ export function WorkshopResultClient({ formulation: f }: Props) {
         <div className="bg-white border border-line rounded-2xl overflow-hidden">
           <div className="px-4 py-3 border-b border-line flex items-center justify-between gap-2">
             <p className="text-sm font-semibold text-ink-900">Ingredient Formulation</p>
-            <span className="text-xs text-ink-500 tabular-nums">{fmtGram(totalGrams)} / 25g</span>
+            <span className="text-xs text-ink-500 tabular-nums">{fmtGram(totalGrams)} / {f.target_grams}g</span>
           </div>
 
-          <div className="grid grid-cols-[2rem_1fr_auto_auto_auto] gap-x-3 px-4 py-2 bg-sand-50 text-xs text-ink-500 font-medium border-b border-line">
+          <div className="grid grid-cols-[2rem_1fr_auto_auto] gap-x-3 px-4 py-2 bg-sand-50 text-xs text-ink-500 font-medium border-b border-line">
             <span>#</span>
             <span>Ingredient</span>
             <span className="text-right w-12">Drops</span>
-            <span className="text-right w-12">Grams</span>
-            <span className="text-right w-10">Adj</span>
+            <span className="text-right w-14">Grams</span>
           </div>
 
           {items.length === 0 ? (
@@ -183,7 +179,7 @@ export function WorkshopResultClient({ formulation: f }: Props) {
               const mat = item.workshop_materials
               const cat = mat?.scent_categories ?? null
               return (
-                <div key={item.id} className="grid grid-cols-[2rem_1fr_auto_auto_auto] gap-x-3 px-4 py-3 border-b border-line last:border-0 items-start">
+                <div key={item.id} className="grid grid-cols-[2rem_1fr_auto_auto] gap-x-3 px-4 py-3 border-b border-line last:border-0 items-start">
                   <span className="text-xs text-ink-400 tabular-nums pt-0.5">{item.line_no}</span>
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-ink-900 leading-tight">{mat?.name ?? '—'}</p>
@@ -195,29 +191,24 @@ export function WorkshopResultClient({ formulation: f }: Props) {
                     </div>
                   </div>
                   <span className="text-sm tabular-nums text-ink-700 text-right w-12 pt-0.5">{item.drops ?? '—'}</span>
-                  <span className="text-sm tabular-nums text-ink-700 text-right w-12 pt-0.5">{item.grams ? fmtGram(item.grams) : '—'}</span>
-                  <span className="text-sm tabular-nums text-ink-500 text-right w-10 pt-0.5">{item.adj != null ? item.adj : '—'}</span>
+                  <span className="text-sm tabular-nums text-pine font-semibold text-right w-14 pt-0.5">{item.grams ? fmtGram(item.grams) : '—'}</span>
                 </div>
               )
             })
           )}
 
-          {/* Total grams footer */}
-          <div className="grid grid-cols-[2rem_1fr_auto_auto_auto] gap-x-3 px-4 py-3 border-t border-line bg-sand-50">
+          <div className="grid grid-cols-[2rem_1fr_auto_auto] gap-x-3 px-4 py-3 border-t border-line bg-sand-50">
             <span />
             <span className="text-xs font-semibold text-ink-700">Total</span>
             <span className="w-12" />
-            <span className="text-sm font-semibold tabular-nums text-ink-900 text-right w-12">{fmtGram(totalGrams)}</span>
-            <span className="w-10" />
+            <span className="text-sm font-semibold tabular-nums text-ink-900 text-right w-14">{fmtGram(totalGrams)}</span>
           </div>
         </div>
 
-        {/* Error */}
         {error && (
           <p className="text-sm text-danger text-center bg-danger/10 rounded-xl py-2 px-4">{error}</p>
         )}
 
-        {/* Actions */}
         <div className="space-y-3 pb-8">
           {status === 'draft' && (
             <button
@@ -229,7 +220,6 @@ export function WorkshopResultClient({ formulation: f }: Props) {
               ✅ Confirm &amp; Save Formulation
             </button>
           )}
-
           <button
             onClick={handleCopy}
             className="w-full py-3 rounded-2xl border border-line bg-white text-sm font-medium text-ink-700 hover:bg-sand-50 active:scale-[0.98] transition-all"

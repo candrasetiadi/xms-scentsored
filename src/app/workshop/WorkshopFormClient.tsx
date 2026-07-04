@@ -20,16 +20,10 @@ interface WorkshopMaterial {
   category: ScentCategory | null
 }
 
-type ItemGrams = number | ''
-type ItemDrops = number | ''
-type ItemAdj   = number | ''
-
 interface FormulationItem {
   _key:        string
   material_id: string
-  drops:       ItemDrops
-  grams:       ItemGrams
-  adj:         ItemAdj
+  drops:       number | ''
 }
 
 interface SlotOption {
@@ -39,7 +33,36 @@ interface SlotOption {
   end_time:   string
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ── Constants & Helpers ───────────────────────────────────────────────────────
+
+const TARGET_GRAMS = 30
+
+interface CountryCode { dial: string; flag: string; name: string }
+const COUNTRY_CODES: CountryCode[] = [
+  { dial: '+62',  flag: '🇮🇩', name: 'Indonesia' },
+  { dial: '+65',  flag: '🇸🇬', name: 'Singapore' },
+  { dial: '+60',  flag: '🇲🇾', name: 'Malaysia' },
+  { dial: '+61',  flag: '🇦🇺', name: 'Australia' },
+  { dial: '+64',  flag: '🇳🇿', name: 'New Zealand' },
+  { dial: '+1',   flag: '🇺🇸', name: 'United States' },
+  { dial: '+44',  flag: '🇬🇧', name: 'United Kingdom' },
+  { dial: '+49',  flag: '🇩🇪', name: 'Germany' },
+  { dial: '+33',  flag: '🇫🇷', name: 'France' },
+  { dial: '+31',  flag: '🇳🇱', name: 'Netherlands' },
+  { dial: '+81',  flag: '🇯🇵', name: 'Japan' },
+  { dial: '+82',  flag: '🇰🇷', name: 'South Korea' },
+  { dial: '+86',  flag: '🇨🇳', name: 'China' },
+  { dial: '+91',  flag: '🇮🇳', name: 'India' },
+  { dial: '+63',  flag: '🇵🇭', name: 'Philippines' },
+  { dial: '+66',  flag: '🇹🇭', name: 'Thailand' },
+  { dial: '+84',  flag: '🇻🇳', name: 'Vietnam' },
+  { dial: '+673', flag: '🇧🇳', name: 'Brunei' },
+  { dial: '+971', flag: '🇦🇪', name: 'UAE' },
+  { dial: '+966', flag: '🇸🇦', name: 'Saudi Arabia' },
+  { dial: '+965', flag: '🇰🇼', name: 'Kuwait' },
+  { dial: '+974', flag: '🇶🇦', name: 'Qatar' },
+]
+const DEFAULT_DIAL = '+62'
 
 const DAYS   = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -52,7 +75,13 @@ function fmtTime(t: string) { return t.slice(0, 5) }
 function fmtSlotLabel(slot: SlotOption) {
   return `${fmtDate(slot.date)}  ·  ${fmtTime(slot.start_time)} – ${fmtTime(slot.end_time)}`
 }
-const formatGram = (n: number) => n % 1 === 0 ? `${n}g` : `${n.toFixed(2)}g`
+const fmtGram = (n: number) => n % 1 === 0 ? `${n}g` : `${n.toFixed(2)}g`
+
+// Rumus normalisasi: gram_per_drop = TARGET_GRAMS / total_drops (guard /0)
+function computeGrams(drops: number | '', totalDrops: number): number {
+  if (totalDrops === 0 || drops === '' || drops === 0) return 0
+  return (TARGET_GRAMS / totalDrops) * (drops as number)
+}
 
 let _keyCounter = 0
 function nextKey() { return String(++_keyCounter) }
@@ -119,7 +148,6 @@ function MaterialPicker({ materials, selectedIds, onSelect, onClose }: MaterialP
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-white">
-      {/* Header */}
       <div className="flex items-center gap-2 px-4 pt-safe-top pt-4 pb-2 border-b border-line bg-white">
         <div className="flex-1 relative">
           <svg
@@ -146,7 +174,6 @@ function MaterialPicker({ materials, selectedIds, onSelect, onClose }: MaterialP
         </button>
       </div>
 
-      {/* Category filter pills */}
       <div className="overflow-x-auto flex gap-2 py-2 px-4 scrollbar-hide border-b border-line bg-white">
         <button
           onClick={() => setCategoryFilter(null)}
@@ -175,7 +202,6 @@ function MaterialPicker({ materials, selectedIds, onSelect, onClose }: MaterialP
         ))}
       </div>
 
-      {/* Material list */}
       <div className="flex-1 overflow-y-auto divide-y divide-line">
         {filtered.length === 0 ? (
           <div className="flex items-center justify-center py-16 text-ink-400 text-sm">
@@ -225,16 +251,17 @@ function MaterialPicker({ materials, selectedIds, onSelect, onClose }: MaterialP
 const DRAFT_KEY = 'workshop_formulation_draft'
 
 interface DraftData {
-  savedAt:       number
-  step:          'info' | 'formulation'
-  name:          string
-  phone:         string
-  social:        string
-  perfumeName:   string
-  theme:         string
-  notes:         string
+  savedAt:        number
+  step:           'info' | 'formulation'
+  name:           string
+  phoneDialCode:  string
+  phoneNumber:    string
+  social:         string
+  perfumeName:    string
+  theme:          string
+  notes:          string
   selectedSlotId: string
-  items:         FormulationItem[]
+  items:          FormulationItem[]
 }
 
 function loadDraft(): DraftData | null {
@@ -242,7 +269,6 @@ function loadDraft(): DraftData | null {
     const raw = localStorage.getItem(DRAFT_KEY)
     if (!raw) return null
     const d = JSON.parse(raw) as DraftData
-    // Discard drafts older than 24 hours
     if (Date.now() - d.savedAt > 24 * 60 * 60 * 1000) {
       localStorage.removeItem(DRAFT_KEY)
       return null
@@ -254,7 +280,7 @@ function loadDraft(): DraftData | null {
 }
 
 function saveDraft(d: DraftData) {
-  try { localStorage.setItem(DRAFT_KEY, JSON.stringify(d)) } catch { /* quota exceeded — ignore */ }
+  try { localStorage.setItem(DRAFT_KEY, JSON.stringify(d)) } catch { /* quota exceeded */ }
 }
 
 function clearDraft() {
@@ -270,9 +296,7 @@ function timeAgo(ts: number) {
 
 // ── WorkshopFormClient ────────────────────────────────────────────────────────
 
-interface Props {
-  initialSlotId: string | null
-}
+interface Props { initialSlotId: string | null }
 
 type Step = 'info' | 'formulation'
 
@@ -287,34 +311,29 @@ export function WorkshopFormClient({ initialSlotId }: Props) {
 
   const [step, setStep] = useState<Step>('info')
 
-  // Customer info
-  const [name,        setName]        = useState('')
-  const [phone,       setPhone]       = useState('')
-  const [social,      setSocial]      = useState('')
+  const [name,          setName]          = useState('')
+  const [phoneDialCode, setPhoneDialCode] = useState(DEFAULT_DIAL)
+  const [phoneNumber,   setPhoneNumber]   = useState('')
+  const [social,        setSocial]        = useState('')
   const [perfumeName, setPerfumeName] = useState('')
   const [theme,       setTheme]       = useState('')
   const [notes,       setNotes]       = useState('')
 
-  // Slot selection
   const [slots,          setSlots]          = useState<SlotOption[]>([])
   const [slotsLoading,   setSlotsLoading]   = useState(true)
   const [selectedSlotId, setSelectedSlotId] = useState<string>(initialSlotId ?? '')
 
-  // Materials
   const [materials,        setMaterials]        = useState<WorkshopMaterial[]>([])
   const [materialsLoading, setMaterialsLoading] = useState(false)
   const [materialsError,   setMaterialsError]   = useState('')
 
-  // Formulation items
   const [items,      setItems]      = useState<FormulationItem[]>([])
   const [showPicker, setShowPicker] = useState(false)
 
-  // Submit
   const [submitting,  setSubmitting]  = useState(false)
   const [submitError, setSubmitError] = useState('')
 
-  // Draft state
-  const [hasDraft,   setHasDraft]   = useState(false)
+  const [hasDraft,     setHasDraft]     = useState(false)
   const [draftSavedAt, setDraftSavedAt] = useState<number | null>(null)
 
   const nameId        = useId()
@@ -325,7 +344,6 @@ export function WorkshopFormClient({ initialSlotId }: Props) {
   const notesId       = useId()
   const slotId_       = useId()
 
-  // Check for existing draft on mount
   useEffect(() => {
     const draft = loadDraft()
     if (draft && (draft.name || draft.items.length > 0)) {
@@ -339,7 +357,8 @@ export function WorkshopFormClient({ initialSlotId }: Props) {
     if (!draft) return
     setStep(draft.step)
     setName(draft.name)
-    setPhone(draft.phone)
+    setPhoneDialCode(draft.phoneDialCode ?? DEFAULT_DIAL)
+    setPhoneNumber(draft.phoneNumber ?? '')
     setSocial(draft.social)
     setPerfumeName(draft.perfumeName)
     setTheme(draft.theme)
@@ -354,35 +373,31 @@ export function WorkshopFormClient({ initialSlotId }: Props) {
     setHasDraft(false)
   }
 
-  // Auto-save draft on any form change (debounced 800ms)
   const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {
-    if (hasDraft) return // don't overwrite while showing resume prompt
+    if (hasDraft) return
     if (draftTimerRef.current) clearTimeout(draftTimerRef.current)
     draftTimerRef.current = setTimeout(() => {
-      const isEmpty = !name && !phone && !social && !perfumeName && !theme && !notes && items.length === 0
+      const isEmpty = !name && !phoneNumber && !social && !perfumeName && !theme && !notes && items.length === 0
       if (isEmpty) return
       const now = Date.now()
-      saveDraft({ savedAt: now, step, name, phone, social, perfumeName, theme, notes, selectedSlotId, items })
+      saveDraft({ savedAt: now, step, name, phoneDialCode, phoneNumber, social, perfumeName, theme, notes, selectedSlotId, items })
       setDraftSavedAt(now)
     }, 800)
     return () => { if (draftTimerRef.current) clearTimeout(draftTimerRef.current) }
-  }, [step, name, phone, social, perfumeName, theme, notes, selectedSlotId, items, hasDraft])
+  }, [step, name, phoneDialCode, phoneNumber, social, perfumeName, theme, notes, selectedSlotId, items, hasDraft])
 
-  // Fetch today's slots on mount
   const fetchSlots = useCallback(async () => {
     setSlotsLoading(true)
     try {
       const today = new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10)
-      const res  = await fetch(`/api/v1/public/workshop/slots?date=${today}`)
-      const json = await res.json()
+      const res   = await fetch(`/api/v1/public/workshop/slots?date=${today}`)
+      const json  = await res.json()
       const list: SlotOption[] = json.data ?? []
       setSlots(list)
-      if (!initialSlotId && list.length === 1) {
-        setSelectedSlotId(list[0].id)
-      }
+      if (!initialSlotId && list.length === 1) setSelectedSlotId(list[0].id)
     } catch {
-      // silent — slot selection is optional
+      // silent — slot is optional
     } finally {
       setSlotsLoading(false)
     }
@@ -390,7 +405,6 @@ export function WorkshopFormClient({ initialSlotId }: Props) {
 
   useEffect(() => { fetchSlots() }, [fetchSlots])
 
-  // Fetch materials once
   useEffect(() => {
     if (materials.length > 0) return
     setMaterialsLoading(true)
@@ -413,66 +427,49 @@ export function WorkshopFormClient({ initialSlotId }: Props) {
     [items],
   )
 
-  const totalGrams     = useMemo(
-    () => items.reduce((sum, item) => sum + (typeof item.grams === 'number' ? item.grams : 0), 0),
+  // Computed grams (real-time, normalisasi proporsional)
+  const totalDrops = useMemo(
+    () => items.reduce((s, i) => s + (typeof i.drops === 'number' ? i.drops : 0), 0),
     [items],
   )
-  const remainingGrams = 25 - totalGrams
-  const isOver         = totalGrams > 25
-  const isNear         = !isOver && totalGrams >= 20
-  const barPct         = Math.min((totalGrams / 25) * 100, 100)
-  const barColorClass  = isOver ? 'bg-danger' : isNear ? 'bg-amber-400' : 'bg-pine'
-  const textColorClass = isOver ? 'text-danger' : isNear ? 'text-amber-600' : 'text-ink-900'
-
-  const canSubmit  = items.length > 0
-  const canProceed = name.trim() !== '' && perfumeName.trim() !== '' && phone.trim() !== ''
+  const canSubmit  = items.length > 0 && totalDrops > 0
+  const canProceed = name.trim() !== '' && perfumeName.trim() !== '' && phoneNumber.trim() !== '' && theme.trim() !== ''
 
   function handleAddMaterial(material: WorkshopMaterial) {
-    setItems(prev => [
-      ...prev,
-      { _key: nextKey(), material_id: material.id, drops: 0, grams: '', adj: '' },
-    ])
+    setItems(prev => [...prev, { _key: nextKey(), material_id: material.id, drops: 0 }])
   }
 
   function handleRemoveItem(key: string) {
     setItems(prev => prev.filter(i => i._key !== key))
   }
 
-  function handleUpdateItem(key: string, field: 'drops' | 'grams' | 'adj', value: number | '') {
-    setItems(prev => prev.map(i => i._key === key ? { ...i, [field]: value } : i))
-  }
-
-  function parseNumInput(raw: string): number | '' {
-    if (raw === '' || raw === '-') return ''
-    const n = parseFloat(raw)
-    return isNaN(n) ? '' : n
+  function handleDropsChange(key: string, value: number | '') {
+    setItems(prev => prev.map(i => i._key === key ? { ...i, drops: value } : i))
   }
 
   async function handleSubmit() {
     setSubmitError('')
     setSubmitting(true)
-
-    const payload = {
-      slot_id:         selectedSlotId || undefined,
-      customer_name:   name.trim(),
-      customer_phone:  phone.trim()  || undefined,
-      customer_social: social.trim() || undefined,
-      perfume_name:    perfumeName.trim(),
-      theme:           theme.trim()  || undefined,
-      notes:           notes.trim()  || undefined,
-      items: items.map(({ material_id, drops, grams, adj }) => ({
-        material_id,
-        drops: typeof drops === 'number' ? drops : 0,
-        grams: typeof grams === 'number' ? grams : 0,
-        adj:   typeof adj === 'number' ? adj : null,
-      })),
-    }
-
     try {
       const res  = await fetch('/api/v1/public/workshop/formulations', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify(payload),
+        body:    JSON.stringify({
+          customer_name:   name.trim(),
+          customer_phone:  phoneNumber.trim()
+            ? phoneDialCode + phoneNumber.trim().replace(/^0+/, '')
+            : undefined,
+          customer_social: social.trim() || undefined,
+          perfume_name:    perfumeName.trim(),
+          theme:           theme.trim()  || undefined,
+          notes:           notes.trim()  || undefined,
+          slot_id:         selectedSlotId || undefined,
+          target_grams:    TARGET_GRAMS,
+          items: items.map(({ material_id, drops }) => ({
+            material_id,
+            drops: typeof drops === 'number' ? drops : 0,
+          })),
+        }),
       })
       const json = await res.json()
       if (!res.ok) {
@@ -494,7 +491,6 @@ export function WorkshopFormClient({ initialSlotId }: Props) {
     return (
       <div className="flex-1 flex flex-col px-4 py-6 max-w-md mx-auto w-full">
 
-        {/* Resume draft banner */}
         {hasDraft && (
           <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 space-y-2">
             <div className="flex items-start gap-2">
@@ -509,16 +505,10 @@ export function WorkshopFormClient({ initialSlotId }: Props) {
               </div>
             </div>
             <div className="flex gap-2">
-              <button
-                onClick={resumeDraft}
-                className="flex-1 py-2 rounded-xl bg-amber-500 text-white text-sm font-semibold hover:bg-amber-600 transition-colors"
-              >
+              <button onClick={resumeDraft} className="flex-1 py-2 rounded-xl bg-amber-500 text-white text-sm font-semibold hover:bg-amber-600 transition-colors">
                 Continue
               </button>
-              <button
-                onClick={discardDraft}
-                className="flex-1 py-2 rounded-xl border border-amber-300 text-amber-700 text-sm font-medium hover:bg-amber-100 transition-colors"
-              >
+              <button onClick={discardDraft} className="flex-1 py-2 rounded-xl border border-amber-300 text-amber-700 text-sm font-medium hover:bg-amber-100 transition-colors">
                 Start Fresh
               </button>
             </div>
@@ -538,10 +528,8 @@ export function WorkshopFormClient({ initialSlotId }: Props) {
           </div>
         </div>
 
-        {/* Form fields */}
         <div className="space-y-4 flex-1">
 
-          {/* Slot selection */}
           <div>
             <label htmlFor={slotId_} className="block text-xs font-semibold text-ink-500 mb-1.5 uppercase tracking-wide">
               Workshop Session
@@ -555,17 +543,10 @@ export function WorkshopFormClient({ initialSlotId }: Props) {
                 No sessions today
               </div>
             ) : (
-              <select
-                id={slotId_}
-                value={selectedSlotId}
-                onChange={e => setSelectedSlotId(e.target.value)}
-                className={SELECT_CLS}
-              >
+              <select id={slotId_} value={selectedSlotId} onChange={e => setSelectedSlotId(e.target.value)} className={SELECT_CLS}>
                 <option value="">— Select a session —</option>
                 {slots.map(slot => (
-                  <option key={slot.id} value={slot.id}>
-                    {fmtSlotLabel(slot)}
-                  </option>
+                  <option key={slot.id} value={slot.id}>{fmtSlotLabel(slot)}</option>
                 ))}
               </select>
             )}
@@ -575,93 +556,76 @@ export function WorkshopFormClient({ initialSlotId }: Props) {
             <label htmlFor={nameId} className="block text-xs font-semibold text-ink-500 mb-1.5 uppercase tracking-wide">
               Full Name <span className="text-danger">*</span>
             </label>
-            <input
-              id={nameId}
-              type="text"
-              value={name}
-              onChange={e => setName(e.target.value)}
-              placeholder="Your name"
-              autoComplete="name"
-              className={INPUT_CLS}
-            />
+            <input id={nameId} type="text" value={name} onChange={e => setName(e.target.value)}
+              placeholder="Your name" autoComplete="name" maxLength={100} className={INPUT_CLS} />
           </div>
 
           <div>
             <label htmlFor={phoneId} className="block text-xs font-semibold text-ink-500 mb-1.5 uppercase tracking-wide">
-                Phone / WhatsApp <span className="text-danger">*</span>
+              WhatsApp <span className="text-danger">*</span>
             </label>
-            <input
-              id={phoneId}
-              type="tel"
-              value={phone}
-              onChange={e => setPhone(e.target.value)}
-              placeholder="08xxxxxxxxxx"
-              autoComplete="tel"
-              className={INPUT_CLS}
-            />
+            <div className="flex gap-2">
+              <select
+                value={phoneDialCode}
+                onChange={e => setPhoneDialCode(e.target.value)}
+                className="flex-shrink-0 rounded-xl px-3 py-3.5 text-sm border border-line outline-none focus:ring-2 focus:ring-pine-200 focus:border-pine bg-white text-ink-900"
+                style={{ width: '7rem' }}
+              >
+                {COUNTRY_CODES.map(c => (
+                  <option key={c.dial + c.name} value={c.dial}>
+                    {c.flag} {c.dial}
+                  </option>
+                ))}
+              </select>
+              <input
+                id={phoneId}
+                type="tel"
+                value={phoneNumber}
+                onChange={e => setPhoneNumber(e.target.value)}
+                placeholder="812-3456-7890"
+                autoComplete="tel-national"
+                maxLength={15}
+                className={INPUT_CLS}
+              />
+            </div>
+            <p className="text-[11px] text-ink-400 mt-1">Enter number without leading zero — e.g. 812-3456-7890</p>
           </div>
 
           <div>
             <label htmlFor={socialId} className="block text-xs font-semibold text-ink-500 mb-1.5 uppercase tracking-wide">
-              IG / Social
+              Instagram
             </label>
-            <input
-              id={socialId}
-              type="text"
-              value={social}
-              onChange={e => setSocial(e.target.value)}
-              placeholder="@username"
-              autoComplete="off"
-              className={INPUT_CLS}
-            />
+            <input id={socialId} type="text" value={social} onChange={e => setSocial(e.target.value)}
+              placeholder="@username" autoComplete="off" maxLength={30} className={INPUT_CLS} />
           </div>
 
           <div>
             <label htmlFor={perfumeNameId} className="block text-xs font-semibold text-ink-500 mb-1.5 uppercase tracking-wide">
               Perfume Name <span className="text-danger">*</span>
             </label>
-            <input
-              id={perfumeNameId}
-              type="text"
-              value={perfumeName}
-              onChange={e => setPerfumeName(e.target.value)}
-              placeholder="Name your perfume"
-              autoComplete="off"
-              className={INPUT_CLS}
-            />
+            <input id={perfumeNameId} type="text" value={perfumeName} onChange={e => setPerfumeName(e.target.value)}
+              placeholder="Name your perfume" autoComplete="off" maxLength={80} className={INPUT_CLS} />
           </div>
 
           <div>
             <label htmlFor={themeId} className="block text-xs font-semibold text-ink-500 mb-1.5 uppercase tracking-wide">
-              Perfume Theme
+              Perfume Theme <span className="text-danger">*</span>
             </label>
-            <input
-              id={themeId}
-              type="text"
-              value={theme}
-              onChange={e => setTheme(e.target.value)}
-              placeholder="e.g. Fresh & Sporty"
-              autoComplete="off"
-              className={INPUT_CLS}
-            />
+            <input id={themeId} type="text" value={theme} onChange={e => setTheme(e.target.value)}
+              placeholder="e.g. Fresh & Sporty" autoComplete="off" maxLength={80} className={INPUT_CLS} />
           </div>
 
           <div>
             <label htmlFor={notesId} className="block text-xs font-semibold text-ink-500 mb-1.5 uppercase tracking-wide">
               Notes
             </label>
-            <textarea
-              id={notesId}
-              value={notes}
-              onChange={e => setNotes(e.target.value)}
+            <textarea id={notesId} value={notes} onChange={e => setNotes(e.target.value)}
               placeholder="Any preferences or special requests? (optional)"
-              rows={3}
-              className={INPUT_CLS + ' resize-none'}
-            />
+              rows={3} maxLength={400} className={INPUT_CLS + ' resize-none'} />
+            <p className="text-[11px] text-ink-400 mt-1 text-right">{notes.length}/400</p>
           </div>
         </div>
 
-        {/* CTA */}
         <div className="pt-6">
           <button
             onClick={() => setStep('formulation')}
@@ -671,7 +635,7 @@ export function WorkshopFormClient({ initialSlotId }: Props) {
             Next — Perfume Formulation
           </button>
           {!canProceed && (
-            <p className="text-xs text-ink-400 text-center mt-2">Please fill in Full Name, WhatsApp Number, and Perfume Name first</p>
+            <p className="text-xs text-ink-400 text-center mt-2">Please fill in Full Name, WhatsApp Number, Perfume Name, and Perfume Theme first</p>
           )}
         </div>
       </div>
@@ -682,9 +646,9 @@ export function WorkshopFormClient({ initialSlotId }: Props) {
 
   return (
     <>
-      {/* Sticky gram bar */}
+      {/* Sticky step header (no progress bar) */}
       <div className="sticky top-0 z-20 bg-white border-b border-line px-4 py-3">
-        <div className="flex items-center gap-2 mb-2">
+        <div className="flex items-center gap-2">
           <button
             onClick={() => setStep('info')}
             aria-label="Back to your info"
@@ -698,39 +662,17 @@ export function WorkshopFormClient({ initialSlotId }: Props) {
             <span className="w-6 h-6 rounded-full bg-sand-200 text-ink-400 text-xs font-semibold flex items-center justify-center">1</span>
             <div className="w-8 h-px bg-line" />
             <span className="w-6 h-6 rounded-full bg-pine text-white text-xs font-semibold flex items-center justify-center">2</span>
-            <span className="text-sm font-semibold text-ink-900">PERFUME FORMULATION</span>
+            <span className="text-sm font-semibold text-ink-900 uppercase tracking-wide">PERFUME FORMULATION</span>
           </div>
-        </div>
-
-        <div className="flex items-center justify-between mb-1.5">
-          <span className="text-xs text-ink-500">Total</span>
-          <span className={`text-sm font-semibold tabular-nums ${textColorClass}`}>
-            {formatGram(totalGrams)} / 25g
-          </span>
-        </div>
-        <div className="w-full h-2 bg-sand-200 rounded-full overflow-hidden">
-          <div
-            className={`h-full rounded-full transition-all duration-300 ${barColorClass}`}
-            style={{ width: `${barPct}%` }}
-          />
-        </div>
-        {isOver ? (
-          <p className="text-xs text-danger mt-1 font-medium">Exceeds 25g limit — reduce your amounts</p>
-        ) : (
-          <div className="flex items-center justify-between mt-1">
-            <p className="text-xs text-ink-400">
-              Remaining: <span className={`font-medium tabular-nums ${isNear ? 'text-amber-600' : 'text-ink-700'}`}>{formatGram(remainingGrams)}</span>
+          {draftSavedAt && (
+            <p className="ml-auto text-[10px] text-ink-300 flex items-center gap-1 flex-shrink-0">
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+              Saved {timeAgo(draftSavedAt)}
             </p>
-            {draftSavedAt && (
-              <p className="text-[10px] text-ink-300 flex items-center gap-1">
-                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                </svg>
-                Saved {timeAgo(draftSavedAt)}
-              </p>
-            )}
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Item list */}
@@ -749,7 +691,8 @@ export function WorkshopFormClient({ initialSlotId }: Props) {
         )}
 
         {items.map(item => {
-          const material = materialMap.get(item.material_id)
+          const material  = materialMap.get(item.material_id)
+          const itemGrams = computeGrams(item.drops, totalDrops)
           return (
             <div key={item._key} className="bg-white border border-line rounded-2xl p-4 space-y-3">
               <div className="flex items-start justify-between gap-2">
@@ -772,65 +715,56 @@ export function WorkshopFormClient({ initialSlotId }: Props) {
                 </button>
               </div>
 
-              {/* Drops — stepper */}
-              <div>
-                <label className="block text-[10px] font-semibold text-ink-400 mb-1 uppercase tracking-wide">
-                  Drops <span className="text-danger">*</span>
-                </label>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const cur = typeof item.drops === 'number' ? item.drops : 0
-                      handleUpdateItem(item._key, 'drops', Math.max(0, cur - 1))
-                    }}
-                    className="w-10 h-10 flex-shrink-0 rounded-xl border border-line bg-sand-50 text-ink-700 text-lg font-semibold flex items-center justify-center hover:bg-sand-100 active:scale-95 transition-all"
-                    aria-label="Decrease drops"
-                  >
-                    −
-                  </button>
-                  <input
-                    type="number" min={0} step={1}
-                    value={item.drops === '' ? '' : item.drops}
-                    onChange={e => handleUpdateItem(item._key, 'drops', parseNumInput(e.target.value))}
-                    placeholder="0"
-                    className="flex-1 rounded-xl px-3 py-2.5 text-sm border border-line outline-none focus:ring-2 focus:ring-pine-200 focus:border-pine text-ink-900 tabular-nums text-center"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const cur = typeof item.drops === 'number' ? item.drops : 0
-                      handleUpdateItem(item._key, 'drops', cur + 1)
-                    }}
-                    className="w-10 h-10 flex-shrink-0 rounded-xl border border-line bg-sand-50 text-ink-700 text-lg font-semibold flex items-center justify-center hover:bg-sand-100 active:scale-95 transition-all"
-                    aria-label="Increase drops"
-                  >
-                    +
-                  </button>
+              {/* Drops stepper + Grams read-only */}
+              <div className="flex items-end gap-3">
+                <div className="flex-1">
+                  <label className="block text-[10px] font-semibold text-ink-400 mb-1 uppercase tracking-wide">
+                    Drops <span className="text-danger">*</span>
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const cur = typeof item.drops === 'number' ? item.drops : 0
+                        handleDropsChange(item._key, Math.max(0, cur - 1))
+                      }}
+                      className="w-10 h-10 flex-shrink-0 rounded-xl border border-line bg-sand-50 text-ink-700 text-lg font-semibold flex items-center justify-center hover:bg-sand-100 active:scale-95 transition-all"
+                      aria-label="Decrease drops"
+                    >
+                      −
+                    </button>
+                    <input
+                      type="number" min={0} step={1}
+                      value={item.drops === '' ? '' : item.drops}
+                      onChange={e => {
+                        const v = e.target.value
+                        if (v === '') { handleDropsChange(item._key, ''); return }
+                        const n = parseInt(v, 10)
+                        if (!isNaN(n) && n >= 0) handleDropsChange(item._key, n)
+                      }}
+                      placeholder="0"
+                      className="flex-1 rounded-xl px-3 py-2.5 text-sm border border-line outline-none focus:ring-2 focus:ring-pine-200 focus:border-pine text-ink-900 tabular-nums text-center"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const cur = typeof item.drops === 'number' ? item.drops : 0
+                        handleDropsChange(item._key, cur + 1)
+                      }}
+                      className="w-10 h-10 flex-shrink-0 rounded-xl border border-line bg-sand-50 text-ink-700 text-lg font-semibold flex items-center justify-center hover:bg-sand-100 active:scale-95 transition-all"
+                      aria-label="Increase drops"
+                    >
+                      +
+                    </button>
+                  </div>
                 </div>
-              </div>
 
-              {/* Grams + Adj — optional */}
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-[10px] font-semibold text-ink-400 mb-1 uppercase tracking-wide">Grams</label>
-                  <input
-                    type="number" min={0} step={0.01}
-                    value={item.grams === '' ? '' : item.grams}
-                    onChange={e => handleUpdateItem(item._key, 'grams', parseNumInput(e.target.value))}
-                    placeholder="0.00"
-                    className="w-full rounded-xl px-3 py-2.5 text-sm border border-line outline-none focus:ring-2 focus:ring-pine-200 focus:border-pine text-ink-900 tabular-nums text-center"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-semibold text-ink-400 mb-1 uppercase tracking-wide">Adj</label>
-                  <input
-                    type="number" step={0.01}
-                    value={item.adj === '' ? '' : item.adj}
-                    onChange={e => handleUpdateItem(item._key, 'adj', parseNumInput(e.target.value))}
-                    placeholder="—"
-                    className="w-full rounded-xl px-3 py-2.5 text-sm border border-line outline-none focus:ring-2 focus:ring-pine-200 focus:border-pine text-ink-900 tabular-nums text-center"
-                  />
+                {/* Grams — read-only computed */}
+                <div className="flex-shrink-0 text-right pb-0.5">
+                  <p className="text-[10px] font-semibold text-ink-400 uppercase tracking-wide mb-1">Grams</p>
+                  <p className="text-sm font-semibold tabular-nums text-pine">
+                    {itemGrams > 0 ? fmtGram(itemGrams) : '—'}
+                  </p>
                 </div>
               </div>
             </div>

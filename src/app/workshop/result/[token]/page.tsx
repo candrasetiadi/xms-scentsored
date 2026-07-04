@@ -12,11 +12,11 @@ async function fetchFormulation(token: string) {
     .from('workshop_formulations')
     .select(`
       id, access_token, perfume_name, theme, contact_socmed, notes,
-      total_grams, status, created_at,
-      customers ( name, phone, email ),
+      target_grams, total_grams, status, created_at,
+      customers ( name ),
       consultation_slots ( date, start_time, end_time ),
       workshop_formulation_items (
-        id, line_no, drops, grams, adj,
+        id, line_no, drops, grams,
         workshop_materials (
           id, name, dilution_percentage,
           scent_categories ( id, name, color_hex )
