@@ -7,8 +7,8 @@ export const metadata = {
 export default async function WorkshopPage({
   searchParams,
 }: {
-  searchParams: Promise<{ slot_id?: string }>
+  searchParams: Promise<{ slot_id?: string; edit?: string }>
 }) {
-  const { slot_id } = await searchParams
-  return <WorkshopFormClient initialSlotId={slot_id ?? null} />
+  const { slot_id, edit } = await searchParams
+  return <WorkshopFormClient initialSlotId={slot_id ?? null} editToken={edit ?? null} />
 }

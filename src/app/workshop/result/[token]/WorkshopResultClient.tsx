@@ -211,14 +211,22 @@ export function WorkshopResultClient({ formulation: f }: Props) {
 
         <div className="space-y-3 pb-8">
           {status === 'draft' && (
-            <button
-              onClick={handleFinalize}
-              disabled={finalizing}
-              className="w-full py-4 rounded-2xl bg-pine text-white text-base font-semibold hover:bg-pine-700 disabled:opacity-45 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
-            >
-              {finalizing && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
-              ✅ Confirm &amp; Save Formulation
-            </button>
+            <>
+              <button
+                onClick={handleFinalize}
+                disabled={finalizing}
+                className="w-full py-4 rounded-2xl bg-pine text-white text-base font-semibold hover:bg-pine-700 disabled:opacity-45 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+              >
+                {finalizing && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                ✅ Confirm &amp; Save Formulation
+              </button>
+              <a
+                href={`/workshop?edit=${f.access_token}`}
+                className="w-full py-3 rounded-2xl border border-line bg-white text-sm font-medium text-ink-700 hover:bg-sand-50 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+              >
+                ✏️ Edit Formulation
+              </a>
+            </>
           )}
           <button
             onClick={handleCopy}

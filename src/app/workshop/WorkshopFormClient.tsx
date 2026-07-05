@@ -296,7 +296,7 @@ function timeAgo(ts: number) {
 
 // ── WorkshopFormClient ────────────────────────────────────────────────────────
 
-interface Props { initialSlotId: string | null }
+interface Props { initialSlotId: string | null; editToken: string | null }
 
 type Step = 'info' | 'formulation'
 
@@ -306,8 +306,9 @@ const INPUT_CLS =
 const SELECT_CLS =
   'w-full rounded-xl px-4 py-3.5 text-sm border outline-none focus:ring-2 focus:ring-pine-200 focus:border-pine border-line text-ink-900 bg-white'
 
-export function WorkshopFormClient({ initialSlotId }: Props) {
-  const router = useRouter()
+export function WorkshopFormClient({ initialSlotId, editToken }: Props) {
+  const router  = useRouter()
+  const isEdit  = !!editToken
 
   const [step, setStep] = useState<Step>('info')
 
@@ -336,6 +337,8 @@ export function WorkshopFormClient({ initialSlotId }: Props) {
   const [hasDraft,     setHasDraft]     = useState(false)
   const [draftSavedAt, setDraftSavedAt] = useState<number | null>(null)
 
+  const [editLoading, setEditLoading] = useState(isEdit)
+
   const nameId        = useId()
   const phoneId       = useId()
   const socialId      = useId()
@@ -345,12 +348,49 @@ export function WorkshopFormClient({ initialSlotId }: Props) {
   const slotId_       = useId()
 
   useEffect(() => {
+    if (isEdit) return  // skip draft detection in edit mode
     const draft = loadDraft()
     if (draft && (draft.name || draft.items.length > 0)) {
       setHasDraft(true)
       setDraftSavedAt(draft.savedAt)
     }
-  }, [])
+  }, [isEdit])
+
+  // Pre-fill from existing formulation when in edit mode
+  useEffect(() => {
+    if (!editToken) return
+    setEditLoading(true)
+    fetch(`/api/v1/public/workshop/formulations/${editToken}`)
+      .then(r => r.json())
+      .then(json => {
+        const d = json.data
+        if (!d) return
+        setName(d.customer?.name ?? '')
+        // Parse phone back into dial code + number (stored as E.164)
+        const phone = d.customer?.phone ?? ''
+        const matched = COUNTRY_CODES.find(c => phone.startsWith(c.dial))
+        if (matched) {
+          setPhoneDialCode(matched.dial)
+          setPhoneNumber(phone.slice(matched.dial.length))
+        } else if (phone) {
+          setPhoneDialCode(DEFAULT_DIAL)
+          setPhoneNumber(phone)
+        }
+        setSocial(d.contact_socmed ?? '')
+        setPerfumeName(d.perfume_name ?? '')
+        setTheme(d.theme ?? '')
+        setNotes(d.notes ?? '')
+        if (d.slot_id) setSelectedSlotId(d.slot_id)
+        setItems((d.items ?? []).map((item: { material_id: string; drops: number }) => ({
+          _key:        nextKey(),
+          material_id: item.material_id,
+          drops:       item.drops ?? 1,
+        })))
+        setStep('formulation')
+      })
+      .catch(() => { /* silent — user can fill manually */ })
+      .finally(() => setEditLoading(false))
+  }, [editToken]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function resumeDraft() {
     const draft = loadDraft()
@@ -375,7 +415,7 @@ export function WorkshopFormClient({ initialSlotId }: Props) {
 
   const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {
-    if (hasDraft) return
+    if (isEdit || hasDraft) return
     if (draftTimerRef.current) clearTimeout(draftTimerRef.current)
     draftTimerRef.current = setTimeout(() => {
       const isEmpty = !name && !phoneNumber && !social && !perfumeName && !theme && !notes && items.length === 0
@@ -385,7 +425,7 @@ export function WorkshopFormClient({ initialSlotId }: Props) {
       setDraftSavedAt(now)
     }, 800)
     return () => { if (draftTimerRef.current) clearTimeout(draftTimerRef.current) }
-  }, [step, name, phoneDialCode, phoneNumber, social, perfumeName, theme, notes, selectedSlotId, items, hasDraft])
+  }, [step, name, phoneDialCode, phoneNumber, social, perfumeName, theme, notes, selectedSlotId, items, hasDraft, isEdit])
 
   const fetchSlots = useCallback(async () => {
     setSlotsLoading(true)
@@ -436,7 +476,7 @@ export function WorkshopFormClient({ initialSlotId }: Props) {
   const canProceed = name.trim() !== '' && perfumeName.trim() !== '' && phoneNumber.trim() !== '' && theme.trim() !== ''
 
   function handleAddMaterial(material: WorkshopMaterial) {
-    setItems(prev => [...prev, { _key: nextKey(), material_id: material.id, drops: 0 }])
+    setItems(prev => [...prev, { _key: nextKey(), material_id: material.id, drops: 1 }])
   }
 
   function handleRemoveItem(key: string) {
@@ -451,38 +491,70 @@ export function WorkshopFormClient({ initialSlotId }: Props) {
     setSubmitError('')
     setSubmitting(true)
     try {
-      const res  = await fetch('/api/v1/public/workshop/formulations', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({
-          customer_name:   name.trim(),
-          customer_phone:  phoneNumber.trim()
-            ? phoneDialCode + phoneNumber.trim().replace(/^0+/, '')
-            : undefined,
-          customer_social: social.trim() || undefined,
-          perfume_name:    perfumeName.trim(),
-          theme:           theme.trim()  || undefined,
-          notes:           notes.trim()  || undefined,
-          slot_id:         selectedSlotId || undefined,
-          target_grams:    TARGET_GRAMS,
-          items: items.map(({ material_id, drops }) => ({
-            material_id,
-            drops: typeof drops === 'number' ? drops : 0,
-          })),
-        }),
-      })
+      const itemsPayload = items.map(({ material_id, drops }) => ({
+        material_id,
+        drops: typeof drops === 'number' ? drops : 0,
+      }))
+
+      let res: Response
+      if (isEdit && editToken) {
+        res = await fetch(`/api/v1/public/workshop/formulations/${editToken}`, {
+          method:  'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({
+            contact_socmed: social.trim() || null,
+            perfume_name:   perfumeName.trim(),
+            theme:          theme.trim()  || null,
+            notes:          notes.trim()  || null,
+            target_grams:   TARGET_GRAMS,
+            items:          itemsPayload,
+          }),
+        })
+      } else {
+        res = await fetch('/api/v1/public/workshop/formulations', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({
+            customer_name:   name.trim(),
+            customer_phone:  phoneNumber.trim()
+              ? phoneDialCode + phoneNumber.trim().replace(/^0+/, '')
+              : undefined,
+            customer_social: social.trim() || undefined,
+            perfume_name:    perfumeName.trim(),
+            theme:           theme.trim()  || undefined,
+            notes:           notes.trim()  || undefined,
+            slot_id:         selectedSlotId || undefined,
+            target_grams:    TARGET_GRAMS,
+            items:           itemsPayload,
+          }),
+        })
+      }
+
       const json = await res.json()
       if (!res.ok) {
         setSubmitError(json.error?.message ?? json.error ?? 'Failed to save formulation. Please try again.')
         return
       }
       clearDraft()
-      router.push(`/workshop/result/${json.data.access_token}`)
+      const token = isEdit ? editToken : json.data.access_token
+      router.push(`/workshop/result/${token}`)
     } catch {
       setSubmitError('Connection failed. Check your internet and try again.')
     } finally {
       setSubmitting(false)
     }
+  }
+
+  // ── Edit loading screen ───────────────────────────────────────────────────
+  if (editLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-sand-50">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-pine border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm text-ink-500">Loading formulation…</p>
+        </div>
+      </div>
+    )
   }
 
   // ── Step 1: Info ───────────────────────────────────────────────────────────
@@ -796,7 +868,9 @@ export function WorkshopFormClient({ initialSlotId }: Props) {
             disabled={!canSubmit || submitting}
             className="w-full py-4 rounded-2xl bg-pine text-white text-base font-semibold disabled:opacity-40 hover:bg-pine-700 active:scale-[0.98] transition-all"
           >
-            {submitting ? 'Saving...' : 'Save Formulation'}
+            {submitting
+              ? 'Saving...'
+              : isEdit ? 'Update Formulation' : 'Save Formulation'}
           </button>
           {items.length === 0 && (
             <p className="text-xs text-ink-400 text-center">Add at least 1 ingredient first</p>

@@ -496,22 +496,17 @@ export function PosClient({
           {filteredProducts.map(product => {
             const stock = stockMap[product.id] ?? null
             const cartItem = cart.find(i => i.product.id === product.id)
-            const isOutOfStock = product.type === 'ready_stock' && stock !== null && stock <= 0
 
             return (
               <button
                 key={product.id}
-                onClick={() => !isOutOfStock && addToCart(product)}
-                disabled={isOutOfStock}
+                onClick={() => addToCart(product)}
                 aria-label={cartItem ? `${product.name}, ${cartItem.qty} di keranjang` : product.name}
                 className={[
-                  'relative rounded-xl text-left transition-all duration-150 shadow-sm cursor-pointer select-none bg-white',
+                  'relative rounded-xl text-left transition-all duration-150 shadow-sm cursor-pointer select-none bg-white active:scale-[0.97]',
                   cartItem
                     ? 'border-2 border-pine bg-pine-50'
                     : 'border border-line hover:shadow-md hover:border-pine-200',
-                  isOutOfStock
-                    ? 'opacity-50 pointer-events-none'
-                    : 'active:scale-[0.97]',
                 ].join(' ')}
               >
                 {/* Image */}
@@ -556,9 +551,9 @@ export function PosClient({
                     <p className="text-[15px] font-bold text-pine tabular-nums">{formatRp(product.price)}</p>
                     {product.type === 'ready_stock' && stock !== null && (
                       <p className={`text-[11px] ${
-                        stock <= 0 ? 'text-danger font-medium' : stock <= 5 ? 'text-warning font-medium' : 'text-ink-400'
+                        stock <= 0 ? 'text-warning font-medium' : stock <= 5 ? 'text-warning font-medium' : 'text-ink-400'
                       }`}>
-                        {stock <= 0 ? 'Habis' : stock}
+                        {stock <= 0 ? '⚠ Stok 0' : stock}
                       </p>
                     )}
                   </div>
@@ -574,7 +569,7 @@ export function PosClient({
         <CartPanel
           cart={cart} subtotal={subtotal} discount={discount} total={total}
           driverId={driverId} custName={custName} custPhone={custPhone}
-          drivers={drivers} selectedDriver={selectedDriver}
+          drivers={drivers} selectedDriver={selectedDriver} stockMap={stockMap}
           setDiscount={setDiscount} setDriverId={setDriverId}
           setCustName={setCustName} setCustPhone={setCustPhone}
           updateQty={updateQty} removeItem={removeItem}
@@ -612,7 +607,7 @@ export function PosClient({
               <CartPanel
                 cart={cart} subtotal={subtotal} discount={discount} total={total}
                 driverId={driverId} custName={custName} custPhone={custPhone}
-                drivers={drivers} selectedDriver={selectedDriver}
+                drivers={drivers} selectedDriver={selectedDriver} stockMap={stockMap}
                 setDiscount={setDiscount} setDriverId={setDriverId}
                 setCustName={setCustName} setCustPhone={setCustPhone}
                 updateQty={updateQty} removeItem={removeItem}
@@ -1152,6 +1147,7 @@ interface CartPanelProps {
   custPhone:      string
   drivers:        Driver[]
   selectedDriver: Driver | undefined
+  stockMap:       Record<string, number>
   setDiscount:    (v: number) => void
   setDriverId:    (v: string) => void
   setCustName:    (v: string) => void
@@ -1169,7 +1165,7 @@ interface CartPanelProps {
 function CartPanel({
   cart, subtotal, discount, total,
   driverId, custName, custPhone,
-  drivers, selectedDriver,
+  drivers, selectedDriver, stockMap,
   setDiscount, setDriverId, setCustName, setCustPhone,
   updateQty, removeItem, onCheckout,
   inputCls,
@@ -1177,6 +1173,9 @@ function CartPanel({
 }: CartPanelProps) {
   const isEmpty    = cart.length === 0
   const cartCount  = cart.reduce((s, i) => s + i.qty, 0)
+  const lowStockItems = cart.filter(i =>
+    i.product.type === 'ready_stock' && (stockMap[i.product.id] ?? 1) <= 0
+  )
 
   return (
     <div className="flex flex-col h-full">
@@ -1229,6 +1228,12 @@ function CartPanel({
             </div>
             <p>Keranjang kosong.</p>
             <p className="text-xs mt-1">Tap produk untuk menambahkan.</p>
+          </div>
+        )}
+        {lowStockItems.length > 0 && (
+          <div className="mx-3 mb-2 px-3 py-2 rounded-lg bg-warning-bg border border-warning-bd text-[11px] text-warning leading-snug">
+            ⚠ Stok bahan baku mungkin tidak mencukupi untuk:{' '}
+            {lowStockItems.map(i => i.product.name).join(', ')}. Transaksi tetap bisa dilanjutkan.
           </div>
         )}
         {cart.map((item, idx) => (
