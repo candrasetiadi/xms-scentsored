@@ -173,10 +173,12 @@ export function TvClient({ branchId }: Props) {
       })
   }, [branchId])
 
-  // ── Initial load ──────────────────────────────────────────────────────────────
+  // ── Initial load + polling per menit ─────────────────────────────────────────
 
   useEffect(() => {
     fetchOrders()
+    const id = setInterval(fetchOrders, 15_000)
+    return () => clearInterval(id)
   }, [fetchOrders])
 
   // ── Realtime ──────────────────────────────────────────────────────────────────
