@@ -158,7 +158,7 @@ export function ProductsClient({ initialData }: { initialData: Product[] }) {
               <select className={inputCls} value={form.type}
                 onChange={e => setForm(f => ({ ...f, type: e.target.value as Product['type'] }))}>
                 <option value="ready_stock">Ready Stock</option>
-                <option value="custom_racik">Custom Racik</option>
+                <option value="custom_racik">Racik</option>
               </select>
             )}
           </div>
