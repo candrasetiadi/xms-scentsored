@@ -303,6 +303,7 @@ export function PosClient({
 
   function openPayModal() {
     if (cart.length === 0) return
+    if (!custName.trim() || !custPhone.trim()) return
     setPayMethod(null)
     setEdcMachineId('')
     setErrorMsg(null)
@@ -935,7 +936,7 @@ function CustomerSearchInput({
       <div className="relative">
         <input
           className={`${inputCls} w-full pr-8`}
-          placeholder="Nama / No. HP pelanggan (opsional)"
+          placeholder="Nama / No. HP pelanggan *"
           value={query}
           onChange={e => handleQueryChange(e.target.value)}
           onFocus={() => { if (results.length > 0) setOpen(true) }}
@@ -996,7 +997,7 @@ function CustomerSearchInput({
       {/* Phone input — always visible for manual entry / override */}
       <input
         className={`${inputCls} w-full`}
-        placeholder="No. HP (opsional)"
+        placeholder="No. HP WhatsApp *"
         type="tel"
         value={phone}
         onChange={e => onPhoneChange(e.target.value)}
@@ -1171,11 +1172,12 @@ function CartPanel({
   inputCls,
   staffList, salesStaffId, salesStaffName, onSalesSelect,
 }: CartPanelProps) {
-  const isEmpty    = cart.length === 0
-  const cartCount  = cart.reduce((s, i) => s + i.qty, 0)
+  const isEmpty       = cart.length === 0
+  const cartCount     = cart.reduce((s, i) => s + i.qty, 0)
   const lowStockItems = cart.filter(i =>
     i.product.type === 'ready_stock' && (stockMap[i.product.id] ?? 1) <= 0
   )
+  const canCheckout   = !isEmpty && custName.trim() !== '' && custPhone.trim() !== ''
 
   return (
     <div className="flex flex-col h-full">
@@ -1325,8 +1327,14 @@ function CartPanel({
           </div>
 
           {/* Checkout CTA */}
+          {!isEmpty && !canCheckout && (
+            <p className="text-[11px] text-warning text-center mt-2">
+              ⚠ Isi nama &amp; nomor WhatsApp customer dulu
+            </p>
+          )}
           <button
             onClick={onCheckout}
+            disabled={!canCheckout}
             className="w-full bg-rust hover:bg-rust-600 text-white font-semibold text-[15px] rounded-xl py-3.5 mt-2 transition-colors active:scale-[0.98] disabled:opacity-40 disabled:pointer-events-none"
           >
             Bayar · {formatRp(total)}

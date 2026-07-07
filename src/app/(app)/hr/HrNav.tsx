@@ -23,21 +23,20 @@ function VendorIcon()   { return <svg width="16" height="16" viewBox="0 0 16 16"
 function VendorPayIcon(){ return <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="1" y="4" width="14" height="9" rx="1"/><path d="M1 7h14"/><circle cx="8" cy="10.5" r="1.5"/></svg> }
 
 const STAFF_ITEMS: NavItem[] = [
-  { label: 'Absensi Saya', href: '/hr/attendance',        icon: <ClockIcon />,   admin: false },
-  { label: 'Lembur',        href: '/hr/overtime',          icon: <OvertimeIcon />, admin: false },
-  { label: 'Cuti',           href: '/hr/leave',             icon: <LeaveIcon />,   admin: false },
-  { label: 'Slip Gaji',     href: '/hr/payslips',          icon: <PayslipIcon />, admin: false },
+  { label: 'Absensi Saya', href: '/hr/attendance', icon: <ClockIcon />,   admin: false },
+  { label: 'Cuti',          href: '/hr/leave',      icon: <LeaveIcon />,   admin: false },
+  { label: 'Slip Gaji',    href: '/hr/payslips',   icon: <PayslipIcon />, admin: false },
 ]
 
 const ADMIN_ITEMS: NavItem[] = [
-  { label: 'Rekap Absensi', href: '/hr/attendance/admin', icon: <UsersIcon />,   admin: true },
-  { label: 'Lembur',        href: '/hr/overtime',          icon: <OvertimeIcon />, admin: true },
-  { label: 'Cuti',           href: '/hr/leave',             icon: <LeaveIcon />,   admin: true },
-  { label: 'Shift & Jadwal',href: '/hr/shifts',            icon: <ShiftIcon />,   admin: true },
-  { label: 'Komponen Gaji', href: '/hr/salary',            icon: <SalaryIcon />,    admin: true },
-  { label: 'Payroll',        href: '/hr/payroll',           icon: <PayrollIcon />,  admin: true },
-  { label: 'Vendor',         href: '/hr/vendors',           icon: <VendorIcon />,   admin: true },
-  { label: 'Pengaturan SDM',href: '/hr/settings',          icon: <SettingIcon />,  admin: true },
+  { label: 'Karyawan',       href: '/hr/staff',            icon: <UsersIcon />,   admin: true },
+  { label: 'Rekap Absensi', href: '/hr/attendance/admin', icon: <ClockIcon />,   admin: true },
+  { label: 'Cuti',           href: '/hr/leave',             icon: <LeaveIcon />,  admin: true },
+  { label: 'Shift & Jadwal',href: '/hr/shifts',            icon: <ShiftIcon />,  admin: true },
+  { label: 'Komponen Gaji', href: '/hr/salary',            icon: <SalaryIcon />, admin: true },
+  { label: 'Payroll',        href: '/hr/payroll',           icon: <PayrollIcon />,admin: true },
+  { label: 'Vendor',         href: '/hr/vendors',           icon: <VendorIcon />, admin: true },
+  { label: 'Pengaturan SDM',href: '/hr/settings',          icon: <SettingIcon />,admin: true },
 ]
 
 interface Props {

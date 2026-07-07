@@ -20,14 +20,15 @@ export default async function AttendanceAdminPage() {
     redirect('/hr/attendance')
   }
 
-  const { data: branches } = await supabase
-    .from('branches')
-    .select('id, name')
-    .order('name')
+  const [{ data: branches }, { data: staffList }] = await Promise.all([
+    supabase.from('branches').select('id, name').order('name'),
+    supabase.from('staff').select('id, name, branch_id').eq('active', true).order('name'),
+  ])
 
   return (
     <AttendanceAdminClient
       branches={branches ?? []}
+      staffList={staffList ?? []}
       defaultBranchId={staff?.branch_id ?? null}
       role={staff?.role ?? 'admin'}
     />

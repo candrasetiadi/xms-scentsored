@@ -219,7 +219,8 @@ export function TvClient({ branchId }: Props) {
         className="min-h-screen flex flex-col items-center justify-center"
         style={{ background: 'var(--color-pine-900, #021a12)' }}
       >
-        <span className="font-display text-4xl text-sand-300 mb-4">Scentsored</span>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/brand/logo_web.png" alt="Scentsored" className="h-12 w-auto object-contain brightness-0 invert mb-4 opacity-60" />
         <p className="text-sand-400 text-sm text-center px-8 leading-relaxed">
           Scan QR atau akses dengan{' '}
           <span className="font-mono bg-pine-800/50 px-1.5 py-0.5 rounded text-sand-300">
@@ -239,14 +240,15 @@ export function TvClient({ branchId }: Props) {
     >
       {/* Header */}
       <header className="flex flex-col items-center pt-10 pb-6 px-8 border-b border-pine-800/60">
-        <span className="font-display text-5xl text-sand-100 leading-none tracking-wide">
-          Scentsored
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/brand/logo_web.png"
+          alt="Scentsored"
+          className="h-[70px] w-auto object-contain brightness-0 invert"
+        />
+        <span className="mt-3 text-sand-400 text-sm uppercase tracking-widest">
+          Bandung
         </span>
-        {branchName && (
-          <span className="mt-2 text-sand-400 text-sm uppercase tracking-widest">
-            {branchName}
-          </span>
-        )}
       </header>
 
       {/* Main content */}

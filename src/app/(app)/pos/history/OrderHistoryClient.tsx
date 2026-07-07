@@ -204,18 +204,15 @@ export function OrderHistoryClient({
                           {resending === order.id ? '…' : 'Resend WA'}
                         </button>
                       )}
-                      {/* Cancel (draft/awaiting_payment = semua; paid = owner/admin saja) */}
-                      {order.status !== 'cancelled' && order.status !== 'completed' && (
-                        (['draft', 'awaiting_payment'].includes(order.status) ||
-                          ['owner', 'admin'].includes(staffRole)) && (
-                          <button
-                            onClick={() => handleCancel(order.id)}
-                            disabled={cancelling === order.id}
-                            className="text-xs text-ink-400 hover:text-danger disabled:opacity-40"
-                          >
-                            {cancelling === order.id ? '…' : 'Batal'}
-                          </button>
-                        )
+                      {/* Cancel — disembunyikan untuk paid/completed/cancelled */}
+                      {['draft', 'awaiting_payment', 'in_production', 'ready'].includes(order.status) && (
+                        <button
+                          onClick={() => handleCancel(order.id)}
+                          disabled={cancelling === order.id}
+                          className="text-xs text-ink-400 hover:text-danger disabled:opacity-40"
+                        >
+                          {cancelling === order.id ? '…' : 'Batal'}
+                        </button>
                       )}
                     </div>
                   </td>

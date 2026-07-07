@@ -63,17 +63,18 @@ export function SlotsClient({ branches, defaultBranchId }: { branches: Branch[];
   const [bookingsLoading, setBookingsLoading] = useState(false)
 
   // Modal: buat slot satuan
-  const [showCreate, setShowCreate] = useState(false)
-  const [form, setForm] = useState({ date: '', start_time: '09:00', end_time: '10:30', max_bookings: 16, price: 0, notes: '' })
-  const [creating, setCreating] = useState(false)
-  const [createErr, setCreateErr] = useState('')
+  const [showCreate,  setShowCreate]  = useState(false)
+  const [form,        setForm]        = useState({ date: '', start_time: '09:00', end_time: '10:30', max_bookings: 16, notes: '' })
+  const [formPrice,   setFormPrice]   = useState('0')
+  const [creating,    setCreating]    = useState(false)
+  const [createErr,   setCreateErr]   = useState('')
 
   // Modal: generate jadwal bulk
   const [showGenerate,    setShowGenerate]    = useState(false)
   const [genFrom,         setGenFrom]         = useState(todayStr)
   const [genTo,           setGenTo]           = useState(() => weeksLater(4))
   const [genMaxBook,      setGenMaxBook]      = useState(16)
-  const [genPrice,        setGenPrice]        = useState(0)
+  const [genPrice,        setGenPrice]        = useState<string>('0')
   const [genSkipWeek,     setGenSkipWeek]     = useState(false)
   const [generating,      setGenerating]      = useState(false)
   const [generateResult,  setGenerateResult]  = useState<{ created: number; skipped: number } | null>(null)
@@ -110,13 +111,14 @@ export function SlotsClient({ branches, defaultBranchId }: { branches: Branch[];
     const res = await fetch('/api/v1/consultation-slots', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...form, branch_id: branchId }),
+      body: JSON.stringify({ ...form, price: parseInt(formPrice) || 0, branch_id: branchId }),
     })
     const json = await res.json()
     setCreating(false)
     if (!res.ok) { setCreateErr(json.error?.message ?? 'Gagal.'); return }
     setShowCreate(false)
-    setForm({ date: '', start_time: '09:00', end_time: '10:30', max_bookings: 16, price: 0, notes: '' })
+    setForm({ date: '', start_time: '09:00', end_time: '10:30', max_bookings: 16, notes: '' })
+    setFormPrice('0')
     loadSlots()
   }
 
@@ -130,7 +132,7 @@ export function SlotsClient({ branches, defaultBranchId }: { branches: Branch[];
         from:         genFrom,
         to:           genTo,
         max_bookings: genMaxBook,
-        price:        genPrice,
+        price:        parseInt(genPrice) || 0,
         skip_weekends: genSkipWeek,
       }),
     })
@@ -407,8 +409,18 @@ export function SlotsClient({ branches, defaultBranchId }: { branches: Branch[];
                 </div>
                 <div>
                   <label className="text-xs font-medium text-ink-600 block mb-1">Harga per orang (Rp)</label>
-                  <input type="number" min={0} step={1000} value={genPrice}
-                    onChange={e => setGenPrice(parseInt(e.target.value) || 0)} className={inputCls} />
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    value={genPrice}
+                    onChange={e => {
+                      const v = e.target.value.replace(/[^0-9]/g, '')
+                      setGenPrice(v === '' ? '' : String(parseInt(v, 10)))
+                    }}
+                    className={inputCls}
+                    placeholder="0"
+                  />
                 </div>
               </div>
               <label className="flex items-center gap-3 cursor-pointer">
@@ -474,8 +486,18 @@ export function SlotsClient({ branches, defaultBranchId }: { branches: Branch[];
                 </div>
                 <div>
                   <label className="text-xs font-medium text-ink-600 block mb-1">Harga/orang (Rp)</label>
-                  <input type="number" min={0} step={1000} value={form.price}
-                    onChange={e => setForm(f => ({ ...f, price: parseInt(e.target.value) || 0 }))} className={inputCls} />
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    value={formPrice}
+                    onChange={e => {
+                      const v = e.target.value.replace(/[^0-9]/g, '')
+                      setFormPrice(v === '' ? '' : String(parseInt(v, 10)))
+                    }}
+                    className={inputCls}
+                    placeholder="0"
+                  />
                 </div>
               </div>
               <div>
