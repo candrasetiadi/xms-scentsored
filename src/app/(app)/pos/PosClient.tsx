@@ -99,12 +99,6 @@ export function PosClient({
   // Success data
   const [successData, setSuccessData] = useState<SuccessData | null>(null)
 
-  // QRIS dynamic state
-  const [qrisOrderId,  setQrisOrderId]  = useState<string | null>(null)
-  const [qrisOrderData, setQrisOrderData] = useState<{ order_number: string; queue_number: number; total: number } | null>(null)
-  const [qrisString,   setQrisString]   = useState<string | null>(null)
-  const [qrisPolling,  setQrisPolling]  = useState(false)
-  const qrisTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // Sales/PIC state — auto-fill dengan akun login, bisa diubah
   const [salesStaffId,   setSalesStaffId]   = useState<string>(staffId)
@@ -140,11 +134,8 @@ export function PosClient({
   const cartCount    = cart.reduce((s, i) => s + i.qty, 0)
   const canCheckout  = cart.length > 0 && custName.trim() !== '' && custPhone.trim() !== ''
 
-  const needsEdc     = payMethod === 'debit_card' || payMethod === 'credit_card'
-  const canConfirm   = payMethod !== null && payMethod !== 'qris' && (!needsEdc || edcMachineId !== '')
-
-  // Cleanup QRIS polling on unmount
-  useEffect(() => () => { if (qrisTimerRef.current) clearInterval(qrisTimerRef.current) }, [])
+  const needsEdc   = payMethod === 'debit_card' || payMethod === 'credit_card'
+  const canConfirm = payMethod !== null && (!needsEdc || edcMachineId !== '')
 
   // Load staff list untuk SalesPicker
   useEffect(() => {
@@ -237,93 +228,11 @@ export function PosClient({
     setPayMethod(null)
     setEdcMachineId('')
     setScreen('pos')
-    stopQrisPolling()
-    setQrisOrderId(null)
-    setQrisOrderData(null)
-    setQrisString(null)
-    setQrisPolling(false)
-  }
-
-  function stopQrisPolling() {
-    if (qrisTimerRef.current) { clearInterval(qrisTimerRef.current); qrisTimerRef.current = null }
   }
 
   function selectSalesStaff(id: string, name: string) {
     setSalesStaffId(id)
     setSalesStaffName(name)
-  }
-
-  async function handleQrisGenerate() {
-    setLoading(true)
-    setErrorMsg(null)
-    stopQrisPolling()
-
-    try {
-      // 1. Buat order
-      const createRes = await fetch('/api/v1/orders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          branch_id:      branchId,
-          driver_id:      null,
-          sales_staff_id: salesStaffId || null,
-          customer_name:  custName || null,
-          customer_phone: custPhone || null,
-          discount,
-          items: cart.map(i => ({
-            product_id: i.product.id, qty: i.qty, unit_price: i.unit_price,
-            is_custom: i.is_custom, customization_notes: i.customization_notes || null,
-            variant_id: i.variant_id || null, size_ml: i.size_ml || null,
-          })),
-        }),
-      })
-      const createJson = await createRes.json()
-      if (!createRes.ok) { setErrorMsg(createJson.error?.message ?? 'Gagal membuat order.'); return }
-
-      const orderId = createJson.data.id
-
-      // 2. Generate QRIS via checkout
-      const checkoutRes = await fetch(`/api/v1/orders/${orderId}/checkout`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ method: 'qris' }),
-      })
-      const checkoutJson = await checkoutRes.json()
-      if (!checkoutRes.ok) {
-        // Batalkan order yang terlanjur dibuat
-        await fetch(`/api/v1/orders/${orderId}/cancel`, { method: 'POST' }).catch(() => {})
-        setErrorMsg(checkoutJson.error?.message ?? 'Gagal generate QRIS.')
-        return
-      }
-
-      setQrisOrderId(orderId)
-      setQrisOrderData({ order_number: createJson.data.order_number, queue_number: createJson.data.queue_number, total: createJson.data.total })
-      setQrisString(checkoutJson.data.qris_string)
-
-      // 3. Mulai polling status setiap 3 detik
-      setQrisPolling(true)
-      qrisTimerRef.current = setInterval(async () => {
-        const r = await fetch(`/api/v1/orders/${orderId}`).catch(() => null)
-        if (!r?.ok) return
-        const j = await r.json()
-        const status = j.data?.status
-        if (status === 'paid' || status === 'in_production' || status === 'ready' || status === 'completed') {
-          stopQrisPolling()
-          setQrisPolling(false)
-          setQrisString(null)
-          setSuccessData({
-            id: orderId, order_number: createJson.data.order_number,
-            queue_number: createJson.data.queue_number,
-            total: createJson.data.total, method: 'qris',
-          })
-          setPayModalOpen(false)
-          setScreen('success')
-        }
-      }, 3000)
-    } catch {
-      setErrorMsg('Koneksi gagal. Coba lagi.')
-    } finally {
-      setLoading(false)
-    }
   }
 
   function openPayModal() {
@@ -824,58 +733,11 @@ export function PosClient({
                 </div>
               )}
 
-              {/* QRIS display */}
+              {/* QRIS info */}
               {payMethod === 'qris' && (
-                <div className="flex flex-col items-center gap-3 pt-1">
-                  {qrisString ? (
-                    <>
-                      {/* Dynamic QR via canvas — render qris_string as QR code */}
-                      <div className="border-2 border-pine-100 rounded-xl p-3 bg-white text-center">
-                        <p className="text-xs text-ink-400 mb-2 font-mono break-all max-w-[200px]">
-                          {/* Show as text fallback; in production pair with a QR lib */}
-                          QR Data aktif
-                        </p>
-                        <div className="w-48 h-48 rounded-lg border border-pine-100 bg-sand-50 flex flex-col items-center justify-center gap-2">
-                          {qrisPolling && (
-                            <svg className="w-6 h-6 text-pine animate-spin" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
-                            </svg>
-                          )}
-                          <p className="text-xs text-ink-500 text-center px-2">
-                            {qrisPolling ? 'Menunggu pembayaran...' : 'QR siap di-scan'}
-                          </p>
-                          <p className="text-[10px] text-ink-400 font-mono text-center px-2 break-all">
-                            {qrisString.slice(0, 40)}…
-                          </p>
-                        </div>
-                      </div>
-                      <p className="text-xs text-ink-500 text-center">
-                        Minta pelanggan scan QRIS,<br/>pembayaran otomatis terkonfirmasi.
-                      </p>
-                      {qrisOrderData && (
-                        <p className="text-xs text-pine font-medium">
-                          Order #{qrisOrderData.order_number} · {formatRp(qrisOrderData.total)}
-                        </p>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      {qrisImageUrl ? (
-                        <div className="border-2 border-pine-100 rounded-xl p-3 bg-white">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={qrisImageUrl} alt="QRIS Scentsored" width={200} height={200} className="block" />
-                        </div>
-                      ) : (
-                        <div className="w-48 h-48 rounded-xl border-2 border-dashed border-line flex items-center justify-center text-ink-300 text-sm">
-                          Klik Buat QRIS
-                        </div>
-                      )}
-                      <p className="text-xs text-ink-500 text-center">
-                        Tekan <strong>Buat QRIS</strong> untuk generate QR dinamis,<br/>atau gunakan QR statis cabang di atas.
-                      </p>
-                    </>
-                  )}
+                <div className="bg-sand-100 rounded-lg border border-line px-3 py-2.5 text-sm text-ink-700">
+                  <p className="font-medium mb-1">Pembayaran QRIS</p>
+                  <p className="text-xs text-ink-500">Minta pelanggan scan QR statis cabang, lalu tekan Konfirmasi setelah pembayaran diterima.</p>
                 </div>
               )}
 
@@ -894,36 +756,17 @@ export function PosClient({
 
             {/* Footer */}
             <div className="px-5 pb-6 pt-3 border-t border-line flex-shrink-0 space-y-2">
-              {payMethod === 'qris' && !qrisString && (
-                <button
-                  onClick={handleQrisGenerate}
-                  disabled={loading}
-                  className="w-full bg-pine hover:bg-pine-700 text-white font-semibold rounded-xl py-3.5 text-[15px] disabled:opacity-40 disabled:pointer-events-none transition-colors"
-                >
-                  {loading ? 'Membuat QRIS…' : `Buat QRIS · ${formatRp(total)}`}
-                </button>
-              )}
-              {payMethod === 'qris' && qrisString && (
-                <button
-                  onClick={() => { stopQrisPolling(); setQrisString(null); setQrisPolling(false); setQrisOrderId(null) }}
-                  className="w-full rounded-xl border border-line text-ink-500 text-sm py-3 hover:bg-sand-50 transition-colors"
-                >
-                  Batalkan & Buat Ulang
-                </button>
-              )}
-              {payMethod !== 'qris' && (
-                <button
-                  onClick={handlePay}
-                  disabled={!canConfirm || loading}
-                  className="w-full bg-rust hover:bg-rust-600 text-white font-semibold rounded-xl py-3.5 text-[15px] disabled:opacity-40 disabled:pointer-events-none transition-colors"
-                >
-                  {loading
-                    ? 'Memproses…'
-                    : payMethod
-                      ? `Konfirmasi ${METHOD_LABEL[payMethod]} · ${formatRp(total)}`
-                      : 'Pilih metode pembayaran'}
-                </button>
-              )}
+              <button
+                onClick={handlePay}
+                disabled={!canConfirm || loading}
+                className="w-full bg-rust hover:bg-rust-600 text-white font-semibold rounded-xl py-3.5 text-[15px] disabled:opacity-40 disabled:pointer-events-none transition-colors"
+              >
+                {loading
+                  ? 'Memproses…'
+                  : payMethod
+                    ? `Konfirmasi ${METHOD_LABEL[payMethod]} · ${formatRp(total)}`
+                    : 'Pilih metode pembayaran'}
+              </button>
             </div>
           </div>
         </div>
