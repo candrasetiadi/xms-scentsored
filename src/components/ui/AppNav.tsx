@@ -10,16 +10,15 @@ import type { Role } from '@/types/domain'
 interface NavItem { label: string; href: string; roles: Role[] }
 
 const NAV_ITEMS: NavItem[] = [
-  { label: 'Dashboard',   href: '/dashboard',        roles: ['owner', 'admin'] },
+  { label: 'Dashboard',   href: '/dashboard',        roles: ['owner', 'admin', 'cashier', 'perfumer', 'stock_keeper'] },
   { label: 'POS',         href: '/pos',              roles: ['owner', 'admin', 'cashier'] },
   { label: 'Riwayat',     href: '/pos/history',      roles: ['owner', 'admin', 'cashier'] },
   { label: 'Inventory',   href: '/inventory',        roles: ['owner', 'admin', 'stock_keeper'] },
   { label: 'Produksi',    href: '/production',       roles: ['owner', 'admin', 'perfumer'] },
   { label: 'Procurement', href: '/procurement',      roles: ['owner', 'admin', 'stock_keeper'] },
-  { label: 'Driver',      href: '/drivers',            roles: ['owner', 'admin'] },
-  { label: 'Komisi',      href: '/admin/commissions', roles: ['owner', 'admin'] },
-  { label: 'Laporan',     href: '/reporting',          roles: ['owner', 'admin'] },
-  { label: 'Formulation Schedule', href: '/admin/slots', roles: ['owner', 'admin'] },
+  { label: 'Komisi',      href: '/admin/commissions',   roles: ['owner', 'admin'] },
+  { label: 'Laporan',     href: '/reporting',           roles: ['owner', 'admin'] },
+  { label: 'Custom Perfume Schedule', href: '/admin/slots', roles: ['owner', 'admin'] },
   { label: 'Master Data', href: '/admin/products',   roles: ['owner', 'admin'] },
   { label: 'Workshop',    href: '/admin/workshop',   roles: ['owner', 'admin'] },
   { label: 'SDM',         href: '/hr',               roles: ['owner', 'admin', 'cashier', 'perfumer', 'stock_keeper'] },

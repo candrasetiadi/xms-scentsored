@@ -8,6 +8,7 @@ import type { DashboardStats } from '@/types/database'
 type Range = 'today' | '7d' | 'month' | 'custom'
 
 interface Props {
+  staffId:   string | null
   staffName: string
   staffRole: string
   branchId:  string | null
@@ -80,7 +81,8 @@ function EmptyRanking({ letter }: { letter: string }) {
 
 // ── Main Component ────────────────────────────────────────────────────────────
 
-export function DashboardClient({ staffName, branchId }: Props) {
+export function DashboardClient({ staffId, staffName, staffRole, branchId }: Props) {
+  const isAdmin = staffRole === 'owner' || staffRole === 'admin'
   const [range,      setRange]      = useState<Range>('today')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo,   setCustomTo]   = useState('')
@@ -95,6 +97,7 @@ export function DashboardClient({ staffName, branchId }: Props) {
     try {
       const params = new URLSearchParams({ from, to })
       if (branchId) params.set('branch_id', branchId)
+      if (!isAdmin && staffId) params.set('sales_staff_id', staffId)
       const res  = await fetch(`/api/v1/dashboard?${params}`)
       const json = await res.json()
       if (!res.ok) { setError(json.error?.message ?? 'Gagal memuat data.'); return }
@@ -104,7 +107,7 @@ export function DashboardClient({ staffName, branchId }: Props) {
     } finally {
       setLoading(false)
     }
-  }, [branchId])
+  }, [branchId, isAdmin, staffId])
 
   useEffect(() => {
     if (range === 'custom') return // custom triggered manually
@@ -207,8 +210,33 @@ export function DashboardClient({ staffName, branchId }: Props) {
           </div>
         )}
 
-        {/* ── B. Summary Cards ─────────────────────────────────────────── */}
-        <div className="grid grid-cols-3 gap-4 sm:grid-cols-1 md:grid-cols-2">
+        {/* ── Non-admin: hanya tampilkan data penjualan sendiri ─────────── */}
+        {!isAdmin && !loading && data && (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+            <div className="bg-pine rounded-lg p-6 shadow-md sm:col-span-2">
+              <p className="font-sans text-[11px] font-medium uppercase tracking-[.22em] text-pine-200">Total Penjualanmu</p>
+              <p className="font-sans text-[36px] font-semibold tabular-nums leading-none text-white mt-2">
+                {formatRingkas(data.summary.total_revenue)}
+              </p>
+              <p className="font-sans text-xs text-pine-200 mt-1">{periodLabel(range)} · {data.summary.total_orders} order</p>
+            </div>
+            <div className="bg-white border border-line rounded-lg p-6 shadow-sm">
+              <p className="font-sans text-[11px] font-medium uppercase tracking-[.22em] text-ink-400">Total Order</p>
+              <p className="font-sans text-[36px] font-semibold tabular-nums leading-none text-ink-900 mt-2">{data.summary.total_orders}</p>
+              <p className="font-sans text-xs text-ink-500 mt-1">transaksi</p>
+            </div>
+          </div>
+        )}
+        {!isAdmin && loading && (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+            <SkeletonCard className="sm:col-span-2" />
+            <SkeletonCard />
+          </div>
+        )}
+
+        {/* ── Admin: full dashboard ──────────────────────────────────────── */}
+        {/* ── B. Summary Cards (admin only) ────────────────────────────── */}
+        {isAdmin && <div className="grid grid-cols-3 gap-4 sm:grid-cols-1 md:grid-cols-2">
           {loading ? (
             <>
               <SkeletonCard className="md:col-span-2 sm:col-span-1" />
@@ -253,10 +281,10 @@ export function DashboardClient({ staffName, branchId }: Props) {
               </div>
             </>
           ) : null}
-        </div>
+        </div>}
 
-        {/* ── C. Rankings ──────────────────────────────────────────────── */}
-        {!loading && data && (
+        {/* ── C. Rankings (admin only) ──────────────────────────────────── */}
+        {isAdmin && !loading && data && (
           <div className="grid grid-cols-2 gap-6">
 
             {/* Top Sales */}
@@ -339,8 +367,8 @@ export function DashboardClient({ staffName, branchId }: Props) {
           </div>
         )}
 
-        {/* ── D. Low Stock ─────────────────────────────────────────────── */}
-        {!loading && data && (
+        {/* ── D. Low Stock (admin only) ────────────────────────────────── */}
+        {isAdmin && !loading && data && (
           <div className="grid grid-cols-2 gap-6">
             <div className="col-span-2 bg-white border border-line rounded-lg shadow-sm overflow-hidden">
               {/* Header */}

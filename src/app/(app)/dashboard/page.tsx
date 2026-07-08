@@ -11,13 +11,14 @@ export default async function DashboardPage() {
 
   const { data: staff } = await supabase
     .from('staff')
-    .select('name, role, branch_id')
+    .select('id, name, role, branch_id')
     .eq('auth_user_id', user.id)
     .eq('active', true)
     .single()
 
   return (
     <DashboardClient
+      staffId={staff?.id ?? null}
       staffName={staff?.name ?? 'Tamu'}
       staffRole={staff?.role ?? 'cashier'}
       branchId={staff?.branch_id ?? null}
