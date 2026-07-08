@@ -112,7 +112,8 @@ export function AttendanceClient({ staffId }: Props) {
   const [history,   setHistory]   = useState<AttendanceRecord[]>([])
   const [loading,   setLoading]   = useState(true)
   const [error,     setError]     = useState<string | null>(null)
-  const [submitting, setSubmitting] = useState(false)
+  const [submitting,  setSubmitting]  = useState(false)
+  const [geoLoading,  setGeoLoading]  = useState(false)
   const [showClockOutConfirm, setShowClockOutConfirm] = useState(false)
 
   const fetchData = useCallback(async () => {
@@ -132,12 +133,47 @@ export function AttendanceClient({ staffId }: Props) {
 
   useEffect(() => { fetchData() }, [fetchData])
 
+  function getLocation(): Promise<{ latitude: number; longitude: number }> {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject(new Error('Perangkat ini tidak mendukung GPS.'))
+        return
+      }
+      navigator.geolocation.getCurrentPosition(
+        pos => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
+        err => {
+          if (err.code === err.PERMISSION_DENIED)
+            reject(new Error('Izin lokasi ditolak. Aktifkan izin lokasi di browser untuk absen.'))
+          else if (err.code === err.POSITION_UNAVAILABLE)
+            reject(new Error('Lokasi tidak tersedia. Pastikan GPS aktif.'))
+          else
+            reject(new Error('Gagal mendapatkan lokasi. Coba lagi.'))
+        },
+        { timeout: 10000, maximumAge: 0, enableHighAccuracy: true },
+      )
+    })
+  }
+
   async function handleClockIn() {
+    setGeoLoading(true)
+    let coords: { latitude: number; longitude: number }
+    try {
+      coords = await getLocation()
+    } catch (e) {
+      showToast((e as Error).message, 'error')
+      setGeoLoading(false)
+      return
+    }
+    setGeoLoading(false)
     setSubmitting(true)
     try {
-      const res  = await fetch('/api/v1/hr/attendance/clock-in', { method: 'POST' })
+      const res  = await fetch('/api/v1/hr/attendance/clock-in', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(coords),
+      })
       const json = await res.json()
-      if (!res.ok) { showToast(json.error?.message ?? 'Gagal clock in.', 'error'); return }
+      if (!res.ok) { showToast(json.error ?? 'Gagal clock in.', 'error'); return }
       showToast(`Clock in berhasil pukul ${formatTime(json.data?.clock_in_at)}`)
       await fetchData()
     } catch {
@@ -149,11 +185,25 @@ export function AttendanceClient({ staffId }: Props) {
 
   async function handleClockOut() {
     setShowClockOutConfirm(false)
+    setGeoLoading(true)
+    let coords: { latitude: number; longitude: number }
+    try {
+      coords = await getLocation()
+    } catch (e) {
+      showToast((e as Error).message, 'error')
+      setGeoLoading(false)
+      return
+    }
+    setGeoLoading(false)
     setSubmitting(true)
     try {
-      const res  = await fetch('/api/v1/hr/attendance/clock-out', { method: 'POST' })
+      const res  = await fetch('/api/v1/hr/attendance/clock-out', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(coords),
+      })
       const json = await res.json()
-      if (!res.ok) { showToast(json.error?.message ?? 'Gagal clock out.', 'error'); return }
+      if (!res.ok) { showToast(json.error ?? 'Gagal clock out.', 'error'); return }
       showToast(`Clock out berhasil pukul ${formatTime(json.data?.clock_out_at)}`)
       await fetchData()
     } catch {
@@ -236,20 +286,20 @@ export function AttendanceClient({ staffId }: Props) {
             ) : clockedIn ? (
               <button
                 onClick={() => setShowClockOutConfirm(true)}
-                disabled={submitting}
+                disabled={submitting || geoLoading}
                 className="w-full bg-rust text-white rounded-xl py-4 text-base font-sans font-semibold hover:bg-rust-600 active:scale-[.98] motion-safe:transition-all focus-visible:outline-2 focus-visible:outline-rust focus-visible:outline-offset-2 disabled:opacity-45 min-h-[56px] flex items-center justify-center gap-2"
               >
-                {submitting && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
-                Clock Out
+                {(submitting || geoLoading) && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                {geoLoading ? 'Mengambil lokasi…' : 'Clock Out'}
               </button>
             ) : (
               <button
                 onClick={handleClockIn}
-                disabled={submitting}
+                disabled={submitting || geoLoading}
                 className="w-full bg-pine text-white rounded-xl py-4 text-base font-sans font-semibold hover:bg-pine-700 active:scale-[.98] motion-safe:transition-all focus-visible:outline-2 focus-visible:outline-pine focus-visible:outline-offset-2 disabled:opacity-45 min-h-[56px] flex items-center justify-center gap-2"
               >
-                {submitting && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
-                Clock In
+                {(submitting || geoLoading) && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                {geoLoading ? 'Mengambil lokasi…' : 'Clock In'}
               </button>
             )}
           </div>
