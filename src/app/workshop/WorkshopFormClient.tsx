@@ -35,7 +35,11 @@ interface SlotOption {
 
 // ── Constants & Helpers ───────────────────────────────────────────────────────
 
-const TARGET_GRAMS = 30
+const SIZE_OPTIONS = [
+  { ml: 35,  grams: 21 },
+  { ml: 50,  grams: 30 },
+  { ml: 100, grams: 60 },
+] as const
 
 interface CountryCode { dial: string; flag: string; name: string }
 const COUNTRY_CODES: CountryCode[] = [
@@ -77,10 +81,10 @@ function fmtSlotLabel(slot: SlotOption) {
 }
 const fmtGram = (n: number) => n % 1 === 0 ? `${n}g` : `${n.toFixed(2)}g`
 
-// Rumus normalisasi: gram_per_drop = TARGET_GRAMS / total_drops (guard /0)
-function computeGrams(drops: number | '', totalDrops: number): number {
+// Rumus normalisasi: gram_per_drop = targetGrams / total_drops (guard /0)
+function computeGrams(drops: number | '', totalDrops: number, targetGrams: number): number {
   if (totalDrops === 0 || drops === '' || drops === 0) return 0
-  return (TARGET_GRAMS / totalDrops) * (drops as number)
+  return (targetGrams / totalDrops) * (drops as number)
 }
 
 let _keyCounter = 0
@@ -246,6 +250,77 @@ function MaterialPicker({ materials, selectedIds, onSelect, onClose }: MaterialP
   )
 }
 
+// ── PerfumeNameSheet ──────────────────────────────────────────────────────────
+
+const PERFUME_NAME_PLACEHOLDERS = [
+  'e.g. Sunset at Dago',
+  'e.g. First Rain',
+  'e.g. Your name / someone you love',
+]
+
+function PerfumeNameSheet({
+  defaultValue, submitting, error, onSubmit, onClose,
+}: {
+  defaultValue: string
+  submitting:   boolean
+  error:        string
+  onSubmit:     (name: string) => void
+  onClose:      () => void
+}) {
+  const [value, setValue] = useState(defaultValue)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [placeholder] = useState(
+    () => PERFUME_NAME_PLACEHOLDERS[Math.floor(Math.random() * PERFUME_NAME_PLACEHOLDERS.length)]
+  )
+
+  useEffect(() => { setTimeout(() => inputRef.current?.focus(), 100) }, [])
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col justify-end">
+      <button className="absolute inset-0 bg-ink-900/50" onClick={onClose} aria-label="Close" />
+      <div className="relative bg-white rounded-t-2xl px-5 pt-5 pb-8 pb-safe-bottom shadow-xl">
+        <div className="w-10 h-1 bg-sand-300 rounded-full mx-auto mb-5" />
+        <h3 className="text-[17px] font-semibold text-ink-900 leading-snug mb-4">
+          Your perfume has a story — what will you call it?
+        </h3>
+        <div className="relative mb-1">
+          <input
+            ref={inputRef}
+            type="text"
+            value={value}
+            onChange={e => setValue(e.target.value.slice(0, 15))}
+            placeholder={placeholder}
+            maxLength={15}
+            className={[
+              'w-full rounded-xl px-4 py-3.5 text-sm border outline-none focus:ring-2 text-ink-900 bg-white placeholder:text-ink-300',
+              value.length >= 15
+                ? 'border-danger focus:ring-danger/20 focus:border-danger'
+                : 'border-line focus:ring-pine-200 focus:border-pine',
+            ].join(' ')}
+            onKeyDown={e => { if (e.key === 'Enter' && value.trim()) onSubmit(value) }}
+          />
+          <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-[11px] tabular-nums ${value.length >= 15 ? 'text-danger font-medium' : 'text-ink-300'}`}>
+            {value.length}/15
+          </span>
+        </div>
+        {value.length >= 15 && (
+          <p className="text-xs text-danger mb-3">Maximum 15 characters reached.</p>
+        )}
+        {error && (
+          <p className="text-xs text-danger bg-danger-bg border border-danger-bd rounded-xl px-3 py-2 mb-3">{error}</p>
+        )}
+        <button
+          onClick={() => onSubmit(value)}
+          disabled={!value.trim() || submitting}
+          className="w-full py-4 rounded-2xl bg-pine text-white text-base font-semibold disabled:opacity-40 hover:bg-pine-700 active:scale-[0.98] transition-all"
+        >
+          {submitting ? 'Saving…' : 'Save Formulation'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ── Draft persistence ─────────────────────────────────────────────────────────
 
 const DRAFT_KEY = 'workshop_formulation_draft'
@@ -261,6 +336,7 @@ interface DraftData {
   theme:          string
   notes:          string
   selectedSlotId: string
+  selectedMl:     number
   items:          FormulationItem[]
 }
 
@@ -331,8 +407,11 @@ export function WorkshopFormClient({ initialSlotId, editToken }: Props) {
   const [items,      setItems]      = useState<FormulationItem[]>([])
   const [showPicker, setShowPicker] = useState(false)
 
-  const [submitting,  setSubmitting]  = useState(false)
-  const [submitError, setSubmitError] = useState('')
+  const [selectedMl, setSelectedMl] = useState<number>(50)
+
+  const [submitting,    setSubmitting]    = useState(false)
+  const [submitError,   setSubmitError]   = useState('')
+  const [showNameSheet, setShowNameSheet] = useState(false)
 
   const [hasDraft,     setHasDraft]     = useState(false)
   const [draftSavedAt, setDraftSavedAt] = useState<number | null>(null)
@@ -404,6 +483,7 @@ export function WorkshopFormClient({ initialSlotId, editToken }: Props) {
     setTheme(draft.theme)
     setNotes(draft.notes)
     setSelectedSlotId(draft.selectedSlotId || initialSlotId || '')
+    if (draft.selectedMl) setSelectedMl(draft.selectedMl)
     setItems(draft.items)
     setHasDraft(false)
   }
@@ -421,7 +501,7 @@ export function WorkshopFormClient({ initialSlotId, editToken }: Props) {
       const isEmpty = !name && !phoneNumber && !social && !perfumeName && !theme && !notes && items.length === 0
       if (isEmpty) return
       const now = Date.now()
-      saveDraft({ savedAt: now, step, name, phoneDialCode, phoneNumber, social, perfumeName, theme, notes, selectedSlotId, items })
+      saveDraft({ savedAt: now, step, name, phoneDialCode, phoneNumber, social, perfumeName, theme, notes, selectedSlotId, selectedMl, items })
       setDraftSavedAt(now)
     }, 800)
     return () => { if (draftTimerRef.current) clearTimeout(draftTimerRef.current) }
@@ -472,8 +552,9 @@ export function WorkshopFormClient({ initialSlotId, editToken }: Props) {
     () => items.reduce((s, i) => s + (typeof i.drops === 'number' ? i.drops : 0), 0),
     [items],
   )
-  const canSubmit  = items.length > 0 && totalDrops > 0
-  const canProceed = name.trim() !== '' && perfumeName.trim() !== '' && phoneNumber.trim() !== '' && theme.trim() !== ''
+  const targetGrams = SIZE_OPTIONS.find(o => o.ml === selectedMl)?.grams ?? 30
+  const canSubmit   = items.length > 0 && totalDrops > 0
+  const canProceed  = name.trim() !== '' && phoneNumber.trim() !== '' && theme.trim() !== ''
 
   function handleAddMaterial(material: WorkshopMaterial) {
     setItems(prev => [...prev, { _key: nextKey(), material_id: material.id, drops: 1 }])
@@ -487,7 +568,7 @@ export function WorkshopFormClient({ initialSlotId, editToken }: Props) {
     setItems(prev => prev.map(i => i._key === key ? { ...i, drops: value } : i))
   }
 
-  async function handleSubmit() {
+  async function handleSubmit(finalPerfumeName: string) {
     setSubmitError('')
     setSubmitting(true)
     try {
@@ -503,10 +584,10 @@ export function WorkshopFormClient({ initialSlotId, editToken }: Props) {
           headers: { 'Content-Type': 'application/json' },
           body:    JSON.stringify({
             contact_socmed: social.trim() || null,
-            perfume_name:   perfumeName.trim(),
+            perfume_name:   finalPerfumeName.trim(),
             theme:          theme.trim()  || null,
             notes:          notes.trim()  || null,
-            target_grams:   TARGET_GRAMS,
+            target_grams:   targetGrams,
             items:          itemsPayload,
           }),
         })
@@ -520,11 +601,11 @@ export function WorkshopFormClient({ initialSlotId, editToken }: Props) {
               ? phoneDialCode + phoneNumber.trim().replace(/^0+/, '')
               : undefined,
             customer_social: social.trim() || undefined,
-            perfume_name:    perfumeName.trim(),
+            perfume_name:    finalPerfumeName.trim(),
             theme:           theme.trim()  || undefined,
             notes:           notes.trim()  || undefined,
             slot_id:         selectedSlotId || undefined,
-            target_grams:    TARGET_GRAMS,
+            target_grams:    targetGrams,
             items:           itemsPayload,
           }),
         })
@@ -672,14 +753,6 @@ export function WorkshopFormClient({ initialSlotId, editToken }: Props) {
           </div>
 
           <div>
-            <label htmlFor={perfumeNameId} className="block text-xs font-semibold text-ink-500 mb-1.5 uppercase tracking-wide">
-              Perfume Name <span className="text-danger">*</span>
-            </label>
-            <input id={perfumeNameId} type="text" value={perfumeName} onChange={e => setPerfumeName(e.target.value)}
-              placeholder="Name your perfume" autoComplete="off" maxLength={80} className={INPUT_CLS} />
-          </div>
-
-          <div>
             <label htmlFor={themeId} className="block text-xs font-semibold text-ink-500 mb-1.5 uppercase tracking-wide">
               Perfume Theme <span className="text-danger">*</span>
             </label>
@@ -707,7 +780,7 @@ export function WorkshopFormClient({ initialSlotId, editToken }: Props) {
             Next — Perfume Formulation
           </button>
           {!canProceed && (
-            <p className="text-xs text-ink-400 text-center mt-2">Please fill in Full Name, WhatsApp Number, Perfume Name, and Perfume Theme first</p>
+            <p className="text-xs text-ink-400 text-center mt-2">Please fill in Full Name, WhatsApp Number, and Perfume Theme first</p>
           )}
         </div>
       </div>
@@ -749,6 +822,30 @@ export function WorkshopFormClient({ initialSlotId, editToken }: Props) {
 
       {/* Item list */}
       <div className="flex-1 px-4 pt-4 pb-36 space-y-3 max-w-md mx-auto w-full">
+
+        {/* Bottle size selector */}
+        <div className="bg-white border border-line rounded-2xl p-4">
+          <p className="text-[10px] font-semibold text-ink-400 uppercase tracking-widest mb-3">Bottle Size</p>
+          <div className="flex gap-2">
+            {SIZE_OPTIONS.map(opt => (
+              <button
+                key={opt.ml}
+                type="button"
+                onClick={() => setSelectedMl(opt.ml)}
+                className={[
+                  'flex-1 rounded-xl py-3 text-center border-2 transition-all',
+                  selectedMl === opt.ml
+                    ? 'border-pine bg-pine-50'
+                    : 'border-line bg-sand-50 hover:border-pine-200',
+                ].join(' ')}
+              >
+                <p className={`text-sm font-bold ${selectedMl === opt.ml ? 'text-pine' : 'text-ink-700'}`}>{opt.ml} ml</p>
+                <p className={`text-[10px] mt-0.5 ${selectedMl === opt.ml ? 'text-pine-600' : 'text-ink-400'}`}>{opt.grams} gram</p>
+              </button>
+            ))}
+          </div>
+        </div>
+
         {materialsError && (
           <div className="rounded-xl border border-danger-bd bg-danger-bg px-4 py-3 text-sm text-danger">
             {materialsError}
@@ -764,7 +861,7 @@ export function WorkshopFormClient({ initialSlotId, editToken }: Props) {
 
         {items.map(item => {
           const material  = materialMap.get(item.material_id)
-          const itemGrams = computeGrams(item.drops, totalDrops)
+          const itemGrams = computeGrams(item.drops, totalDrops, targetGrams)
           return (
             <div key={item._key} className="bg-white border border-line rounded-2xl p-4 space-y-3">
               <div className="flex items-start justify-between gap-2">
@@ -858,25 +955,29 @@ export function WorkshopFormClient({ initialSlotId, editToken }: Props) {
       {/* Sticky bottom submit */}
       <div className="fixed bottom-0 inset-x-0 z-20 bg-white border-t border-line px-4 py-4 pb-safe-bottom">
         <div className="max-w-md mx-auto space-y-2">
-          {submitError && (
-            <p className="text-xs text-danger bg-danger-bg border border-danger-bd rounded-xl px-3 py-2">
-              {submitError}
-            </p>
-          )}
           <button
-            onClick={handleSubmit}
+            onClick={() => { if (canSubmit) setShowNameSheet(true) }}
             disabled={!canSubmit || submitting}
             className="w-full py-4 rounded-2xl bg-pine text-white text-base font-semibold disabled:opacity-40 hover:bg-pine-700 active:scale-[0.98] transition-all"
           >
-            {submitting
-              ? 'Saving...'
-              : isEdit ? 'Update Formulation' : 'Save Formulation'}
+            {isEdit ? 'Update Formulation' : 'Save Formulation'}
           </button>
           {items.length === 0 && (
             <p className="text-xs text-ink-400 text-center">Add at least 1 ingredient first</p>
           )}
         </div>
       </div>
+
+      {/* Perfume Name Bottom Sheet */}
+      {showNameSheet && (
+        <PerfumeNameSheet
+          defaultValue={perfumeName}
+          submitting={submitting}
+          error={submitError}
+          onSubmit={(name) => { setPerfumeName(name); handleSubmit(name) }}
+          onClose={() => { setShowNameSheet(false); setSubmitError('') }}
+        />
+      )}
 
       {showPicker && (
         <MaterialPicker
