@@ -10,18 +10,20 @@ interface Product {
   type: 'ready_stock' | 'custom_racik'; price: number; image_url: string | null
 }
 
-interface Driver { id: string; name: string; fee_value: number; type: string }
+interface ProductVariant { id: string; size_ml: number; price: number }
 
 interface StaffMember { id: string; name: string; role: string }
 
 interface EdcMachine { id: string; bank_name: string; terminal_id: string | null; label: string }
 
 interface CartItem {
-  product: Product
-  qty: number
-  unit_price: number
-  is_custom: boolean
+  product:             Product
+  qty:                 number
+  unit_price:          number
+  is_custom:           boolean
   customization_notes: string
+  variant_id:          string | null
+  size_ml:             number | null
 }
 
 type PaymentMethod = 'cash' | 'debit_card' | 'credit_card' | 'bank_transfer' | 'qris'
@@ -34,11 +36,12 @@ interface SuccessData {
 
 interface Props {
   staffId:      string
+  staffName:    string
   staffRole:    string
   branchId:     string
   branches:     { id: string; name: string }[]
   products:     Product[]
-  drivers:      Driver[]
+  variantMap:   Record<string, ProductVariant[]>
   stockMap:     Record<string, number>
   edcMachines:  EdcMachine[]
   qrisImageUrl: string | null
@@ -68,7 +71,7 @@ const METHOD_ICON: Record<PaymentMethod, string> = {
 // ── Main component ────────────────────────────────────────────────────────────
 
 export function PosClient({
-  staffId, staffRole, branchId, branches, products, drivers, stockMap,
+  staffId, staffName, staffRole, branchId, branches, products, variantMap, stockMap,
   edcMachines, qrisImageUrl,
 }: Props) {
   const router   = useRouter()
@@ -77,7 +80,6 @@ export function PosClient({
   // Cart state
   const [cart,      setCart]      = useState<CartItem[]>([])
   const [discount,  setDiscount]  = useState(0)
-  const [driverId,  setDriverId]  = useState<string>('')
   const [custName,  setCustName]  = useState('')
   const [custPhone, setCustPhone] = useState('')
 
@@ -104,14 +106,18 @@ export function PosClient({
   const [qrisPolling,  setQrisPolling]  = useState(false)
   const qrisTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  // Sales/PIC state
-  const [salesStaffId,   setSalesStaffId]   = useState<string>('')
-  const [salesStaffName, setSalesStaffName] = useState<string>('')
+  // Sales/PIC state — auto-fill dengan akun login, bisa diubah
+  const [salesStaffId,   setSalesStaffId]   = useState<string>(staffId)
+  const [salesStaffName, setSalesStaffName] = useState<string>(staffName)
   const [staffList,      setStaffList]      = useState<StaffMember[]>([])
 
   // Custom racik modal
   const [customProduct, setCustomProduct] = useState<Product | null>(null)
   const [customNotes,   setCustomNotes]   = useState('')
+
+  // Variant picker
+  const [variantProduct,  setVariantProduct]  = useState<Product | null>(null)
+  const [variantNotes,    setVariantNotes]    = useState('')
 
   // ── Derived ────────────────────────────────────────────────────────────────
 
@@ -129,10 +135,10 @@ export function PosClient({
     })
   }, [products, search, category])
 
-  const subtotal       = cart.reduce((s, i) => s + i.qty * i.unit_price, 0)
-  const total          = Math.max(0, subtotal - discount)
-  const cartCount      = cart.reduce((s, i) => s + i.qty, 0)
-  const selectedDriver = drivers.find(d => d.id === driverId)
+  const subtotal     = cart.reduce((s, i) => s + i.qty * i.unit_price, 0)
+  const total        = Math.max(0, subtotal - discount)
+  const cartCount    = cart.reduce((s, i) => s + i.qty, 0)
+  const canCheckout  = cart.length > 0 && custName.trim() !== '' && custPhone.trim() !== ''
 
   const needsEdc     = payMethod === 'debit_card' || payMethod === 'credit_card'
   const canConfirm   = payMethod !== null && payMethod !== 'qris' && (!needsEdc || edcMachineId !== '')
@@ -140,12 +146,8 @@ export function PosClient({
   // Cleanup QRIS polling on unmount
   useEffect(() => () => { if (qrisTimerRef.current) clearInterval(qrisTimerRef.current) }, [])
 
-  // Load PIC from localStorage & fetch staff list
+  // Load staff list untuk SalesPicker
   useEffect(() => {
-    const savedId   = localStorage.getItem('pos_sales_staff_id')   ?? ''
-    const savedName = localStorage.getItem('pos_sales_staff_name') ?? ''
-    if (savedId) { setSalesStaffId(savedId); setSalesStaffName(savedName) }
-
     fetch(`/api/v1/staff?branch_id=${branchId}`)
       .then(r => r.json())
       .then(j => { if (Array.isArray(j.data)) setStaffList(j.data) })
@@ -155,6 +157,12 @@ export function PosClient({
   // ── Cart ops ───────────────────────────────────────────────────────────────
 
   function addToCart(product: Product) {
+    const variants = variantMap[product.id] ?? []
+    if (variants.length > 0) {
+      setVariantProduct(product)
+      setVariantNotes('')
+      return
+    }
     if (product.type === 'custom_racik') {
       setCustomProduct(product)
       setCustomNotes('')
@@ -167,15 +175,39 @@ export function PosClient({
         updated[idx] = { ...updated[idx], qty: updated[idx].qty + 1 }
         return updated
       }
-      return [...prev, { product, qty: 1, unit_price: product.price, is_custom: false, customization_notes: '' }]
+      return [...prev, { product, qty: 1, unit_price: product.price, is_custom: false, customization_notes: '', variant_id: null, size_ml: null }]
     })
+  }
+
+  function addVariantToCart(variant: ProductVariant, notes: string) {
+    if (!variantProduct) return
+    const product = variantProduct
+    setCart(prev => {
+      const idx = prev.findIndex(i => i.product.id === product.id && i.variant_id === variant.id)
+      if (idx >= 0) {
+        const updated = [...prev]
+        updated[idx] = { ...updated[idx], qty: updated[idx].qty + 1 }
+        return updated
+      }
+      return [...prev, {
+        product,
+        qty:                 1,
+        unit_price:          variant.price,
+        is_custom:           true,
+        customization_notes: notes.trim() || `${variant.size_ml}ml`,
+        variant_id:          variant.id,
+        size_ml:             variant.size_ml,
+      }]
+    })
+    setVariantProduct(null)
+    setVariantNotes('')
   }
 
   function addCustomToCart() {
     if (!customProduct) return
     setCart(prev => [...prev, {
       product: customProduct, qty: 1, unit_price: customProduct.price,
-      is_custom: true, customization_notes: customNotes,
+      is_custom: true, customization_notes: customNotes, variant_id: null, size_ml: null,
     }])
     setCustomProduct(null)
     setCustomNotes('')
@@ -198,7 +230,6 @@ export function PosClient({
   function clearCart() {
     setCart([])
     setDiscount(0)
-    setDriverId('')
     setCustName('')
     setCustPhone('')
     setCartOpen(false)
@@ -220,13 +251,6 @@ export function PosClient({
   function selectSalesStaff(id: string, name: string) {
     setSalesStaffId(id)
     setSalesStaffName(name)
-    if (id) {
-      localStorage.setItem('pos_sales_staff_id',   id)
-      localStorage.setItem('pos_sales_staff_name', name)
-    } else {
-      localStorage.removeItem('pos_sales_staff_id')
-      localStorage.removeItem('pos_sales_staff_name')
-    }
   }
 
   async function handleQrisGenerate() {
@@ -241,7 +265,7 @@ export function PosClient({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           branch_id:      branchId,
-          driver_id:      driverId || null,
+          driver_id:      null,
           sales_staff_id: salesStaffId || null,
           customer_name:  custName || null,
           customer_phone: custPhone || null,
@@ -249,6 +273,7 @@ export function PosClient({
           items: cart.map(i => ({
             product_id: i.product.id, qty: i.qty, unit_price: i.unit_price,
             is_custom: i.is_custom, customization_notes: i.customization_notes || null,
+            variant_id: i.variant_id || null, size_ml: i.size_ml || null,
           })),
         }),
       })
@@ -325,7 +350,7 @@ export function PosClient({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           branch_id:      branchId,
-          driver_id:      driverId || null,
+          driver_id:      null,
           sales_staff_id: salesStaffId || null,
           customer_name:  custName || null,
           customer_phone: custPhone || null,
@@ -336,6 +361,8 @@ export function PosClient({
             unit_price:          i.unit_price,
             is_custom:           i.is_custom,
             customization_notes: i.customization_notes || null,
+            variant_id:          i.variant_id || null,
+            size_ml:             i.size_ml || null,
           })),
         }),
       })
@@ -442,15 +469,6 @@ export function PosClient({
 
         {/* Toolbar: branch select + search */}
         <div className="bg-white border-b border-line px-4 py-0 h-14 flex items-center gap-3 flex-shrink-0">
-          {branches.length > 0 && (
-            <select
-              className="bg-sand-50 border border-line rounded-lg px-3 py-2 text-[13px] text-ink-900 focus:outline-none focus:border-pine-400 shrink-0 h-9"
-              value={branchId}
-              onChange={e => router.push(`${pathname}?branch=${e.target.value}`)}
-            >
-              {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-            </select>
-          )}
           {/* Search with icon */}
           <div className="relative flex-1">
             <svg
@@ -466,6 +484,17 @@ export function PosClient({
               onChange={e => setSearch(e.target.value)}
             />
           </div>
+        </div>
+
+        {/* Customer bar — selalu visible */}
+        <div className="bg-white border-b border-line px-3 py-2 flex-shrink-0">
+          <CustomerSearchInput
+            name={custName}
+            phone={custPhone}
+            onNameChange={setCustName}
+            onPhoneChange={setCustPhone}
+            inputCls={inputCls}
+          />
         </div>
 
         {/* Category pills */}
@@ -487,81 +516,73 @@ export function PosClient({
           </div>
         )}
 
-        {/* Product grid */}
-        <div className="flex-1 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3 p-3 content-start">
+        {/* Product list */}
+        <div className="flex-1 overflow-y-auto p-2 sm:p-3">
           {filteredProducts.length === 0 && (
-            <div className="col-span-4 py-16 text-center text-ink-400 text-sm">
+            <div className="py-16 text-center text-ink-400 text-sm">
               Tidak ada produk ditemukan.
             </div>
           )}
-          {filteredProducts.map(product => {
-            const stock = stockMap[product.id] ?? null
-            const cartItem = cart.find(i => i.product.id === product.id)
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-1.5">
+            {filteredProducts.map(product => {
+              const stock    = stockMap[product.id] ?? null
+              const cartItem = cart.find(i => i.product.id === product.id)
+              const isRacik  = product.type === 'custom_racik'
+              const lowStock = stock !== null && stock <= 5
 
-            return (
-              <button
-                key={product.id}
-                onClick={() => addToCart(product)}
-                aria-label={cartItem ? `${product.name}, ${cartItem.qty} di keranjang` : product.name}
-                className={[
-                  'relative rounded-xl text-left transition-all duration-150 shadow-sm cursor-pointer select-none bg-white active:scale-[0.97]',
-                  cartItem
-                    ? 'border-2 border-pine bg-pine-50'
-                    : 'border border-line hover:shadow-md hover:border-pine-200',
-                ].join(' ')}
-              >
-                {/* Image */}
-                <div className="relative w-full aspect-square rounded-t-xl overflow-hidden">
-                  {product.image_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={product.image_url} alt={product.name} className="w-full h-full object-cover bg-sand-100" />
-                  ) : (
-                    <div className="w-full h-full bg-sand-100 flex items-center justify-center">
-                      <svg className="w-8 h-8 text-sand-300" width="32" height="32" viewBox="0 0 32 32" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-                        <rect x="10" y="14" width="12" height="14" rx="2"/>
-                        <rect x="13" y="10" width="6" height="5" rx="1"/>
-                        <rect x="12" y="8" width="8" height="3" rx="1"/>
-                        <circle cx="16" cy="7" r="2"/>
-                      </svg>
-                    </div>
-                  )}
+              const productVariants = variantMap[product.id] ?? []
+              const hasVariants = productVariants.length > 0
+              const priceLabel = hasVariants
+                ? (() => {
+                    const prices = productVariants.map(v => v.price).filter(p => p > 0)
+                    if (prices.length === 0) return 'Pilih ukuran'
+                    const min = Math.min(...prices)
+                    const max = Math.max(...prices)
+                    return min === max ? formatRp(min) : `${formatRp(min)}+`
+                  })()
+                : formatRp(product.price)
 
-                  {/* Type badge */}
-                  <span className={`absolute top-2 left-2 text-[10px] font-semibold rounded-full px-2 py-0.5 ${
-                    product.type === 'custom_racik'
-                      ? 'bg-rust/90 text-white'
-                      : 'bg-pine/90 text-white'
-                  }`}>
-                    {product.type === 'custom_racik' ? 'Racik' : 'Ready'}
-                  </span>
+              return (
+                <button
+                  key={product.id}
+                  onClick={() => addToCart(product)}
+                  aria-label={cartItem ? `${product.name}, ${cartItem.qty} di keranjang` : product.name}
+                  className={[
+                    'relative flex items-center gap-3 rounded-xl px-3.5 py-3 text-left transition-all duration-150 cursor-pointer select-none active:scale-[0.98]',
+                    cartItem
+                      ? 'bg-pine-50 border-2 border-pine shadow-sm'
+                      : 'bg-white border border-line hover:border-pine-200 hover:shadow-sm',
+                  ].join(' ')}
+                >
+                  {/* Type dot */}
+                  <span className={`shrink-0 w-2 h-2 rounded-full mt-0.5 ${isRacik ? 'bg-rust' : 'bg-pine'}`} />
 
-                  {/* Cart qty badge */}
-                  {cartItem && (
-                    <span className="absolute top-2 right-2 bg-pine text-white text-[11px] font-bold w-6 h-6 rounded-full flex items-center justify-center">
-                      {cartItem.qty}
-                    </span>
-                  )}
-                </div>
+                  {/* Name + SKU */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] font-medium text-ink-900 leading-snug truncate">{product.name}</p>
+                    <p className="text-[10px] text-ink-400 font-mono mt-0.5 truncate">{product.sku}</p>
+                  </div>
 
-                {/* Content */}
-                <div className="px-3 pt-2.5 pb-3">
-                  <p className="text-[13px] font-medium text-ink-900 leading-snug line-clamp-2">{product.name}</p>
-                  <p className="text-[10px] text-ink-400 font-mono mt-0.5">{product.sku}</p>
-                  <div className="my-2 border-t border-line" />
-                  <div className="flex justify-between items-end">
-                    <p className="text-[15px] font-bold text-pine tabular-nums">{formatRp(product.price)}</p>
+                  {/* Price + stock */}
+                  <div className="shrink-0 text-right">
+                    <p className="text-[13px] font-bold text-pine tabular-nums">{priceLabel}</p>
                     {product.type === 'ready_stock' && stock !== null && (
-                      <p className={`text-[11px] ${
-                        stock <= 0 ? 'text-warning font-medium' : stock <= 5 ? 'text-warning font-medium' : 'text-ink-400'
-                      }`}>
-                        {stock <= 0 ? '⚠ Stok 0' : stock}
+                      <p className={`text-[10px] tabular-nums mt-0.5 ${lowStock ? 'text-warning font-medium' : 'text-ink-400'}`}>
+                        {stock <= 0 ? '⚠ Habis' : `stok ${stock}`}
                       </p>
                     )}
                   </div>
-                </div>
-              </button>
-            )
-          })}
+
+                  {/* Cart qty badge */}
+                  {cartItem && (
+                    <span className="shrink-0 bg-pine text-white text-[11px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
+                      {cartItem.qty}
+                    </span>
+                  )}
+                </button>
+              )
+            })}
+          </div>
         </div>
       </div>
 
@@ -569,10 +590,8 @@ export function PosClient({
       <div className="hidden lg:flex lg:flex-col w-[380px] bg-white border-l border-line">
         <CartPanel
           cart={cart} subtotal={subtotal} discount={discount} total={total}
-          driverId={driverId} custName={custName} custPhone={custPhone}
-          drivers={drivers} selectedDriver={selectedDriver} stockMap={stockMap}
-          setDiscount={setDiscount} setDriverId={setDriverId}
-          setCustName={setCustName} setCustPhone={setCustPhone}
+          canCheckout={canCheckout} stockMap={stockMap}
+          setDiscount={setDiscount}
           updateQty={updateQty} removeItem={removeItem}
           onCheckout={openPayModal}
           inputCls={inputCls}
@@ -607,10 +626,8 @@ export function PosClient({
             <div className="flex-1 overflow-y-auto">
               <CartPanel
                 cart={cart} subtotal={subtotal} discount={discount} total={total}
-                driverId={driverId} custName={custName} custPhone={custPhone}
-                drivers={drivers} selectedDriver={selectedDriver} stockMap={stockMap}
-                setDiscount={setDiscount} setDriverId={setDriverId}
-                setCustName={setCustName} setCustPhone={setCustPhone}
+                canCheckout={canCheckout} stockMap={stockMap}
+                setDiscount={setDiscount}
                 updateQty={updateQty} removeItem={removeItem}
                 onCheckout={openPayModal}
                 inputCls={inputCls}
@@ -623,6 +640,68 @@ export function PosClient({
           </div>
         </div>
       )}
+
+      {/* ── Variant Picker Modal ────────────────────────────────────────────── */}
+      {variantProduct && (() => {
+        const variants = variantMap[variantProduct.id] ?? []
+        return (
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
+            <button className="absolute inset-0 bg-ink-900/50" onClick={() => setVariantProduct(null)} />
+            <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden">
+              {/* Header */}
+              <div className="px-5 pt-5 pb-4 border-b border-line">
+                <p className="text-[11px] font-semibold text-rust uppercase tracking-widest mb-0.5">Pilih Ukuran</p>
+                <h3 className="font-semibold text-ink-900 text-[15px] leading-snug">{variantProduct.name}</h3>
+              </div>
+
+              {/* Variant options */}
+              <div className="p-4 flex flex-col gap-2.5">
+                {variants.map(v => (
+                  <button
+                    key={v.id}
+                    onClick={() => addVariantToCart(v, variantNotes)}
+                    className="flex items-center justify-between w-full px-4 py-3.5 rounded-xl border border-line hover:border-pine hover:bg-pine-50 active:scale-[0.98] transition-all group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="w-10 h-10 rounded-full bg-sand-100 group-hover:bg-pine-100 flex items-center justify-center text-[13px] font-bold text-ink-700 group-hover:text-pine transition-colors">
+                        {v.size_ml}
+                      </span>
+                      <div className="text-left">
+                        <p className="text-[14px] font-semibold text-ink-900">{v.size_ml} ml</p>
+                        {v.price === 0 && <p className="text-[11px] text-ink-400">Harga belum diset</p>}
+                      </div>
+                    </div>
+                    <p className="text-[15px] font-bold text-pine tabular-nums">
+                      {v.price > 0 ? formatRp(v.price) : '–'}
+                    </p>
+                  </button>
+                ))}
+              </div>
+
+              {/* Notes */}
+              <div className="px-4 pb-4">
+                <label className="text-[11px] font-medium text-ink-500 block mb-1.5">Catatan peracik (opsional)</label>
+                <textarea
+                  className="w-full rounded-lg border border-line-strong px-3 py-2 text-sm text-ink-900 resize-none focus:outline-none focus:border-pine-400 focus:ring-2 focus:ring-pine-100"
+                  rows={2}
+                  placeholder="mis. lebih woody, kurangi bunga…"
+                  value={variantNotes}
+                  onChange={e => setVariantNotes(e.target.value)}
+                />
+              </div>
+
+              <div className="px-4 pb-4">
+                <button
+                  onClick={() => setVariantProduct(null)}
+                  className="w-full border border-line-strong text-ink-700 rounded-xl py-2.5 text-sm font-medium hover:bg-sand-50 transition-colors"
+                >
+                  Batal
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* ── Custom Racik Modal ──────────────────────────────────────────────── */}
       {customProduct && (
@@ -1143,16 +1222,9 @@ interface CartPanelProps {
   subtotal:       number
   discount:       number
   total:          number
-  driverId:       string
-  custName:       string
-  custPhone:      string
-  drivers:        Driver[]
-  selectedDriver: Driver | undefined
+  canCheckout:    boolean
   stockMap:       Record<string, number>
   setDiscount:    (v: number) => void
-  setDriverId:    (v: string) => void
-  setCustName:    (v: string) => void
-  setCustPhone:   (v: string) => void
   updateQty:      (idx: number, delta: number) => void
   removeItem:     (idx: number) => void
   onCheckout:     () => void
@@ -1165,9 +1237,8 @@ interface CartPanelProps {
 
 function CartPanel({
   cart, subtotal, discount, total,
-  driverId, custName, custPhone,
-  drivers, selectedDriver, stockMap,
-  setDiscount, setDriverId, setCustName, setCustPhone,
+  canCheckout, stockMap,
+  setDiscount,
   updateQty, removeItem, onCheckout,
   inputCls,
   staffList, salesStaffId, salesStaffName, onSalesSelect,
@@ -1177,7 +1248,6 @@ function CartPanel({
   const lowStockItems = cart.filter(i =>
     i.product.type === 'ready_stock' && (stockMap[i.product.id] ?? 1) <= 0
   )
-  const canCheckout   = !isEmpty && custName.trim() !== '' && custPhone.trim() !== ''
 
   return (
     <div className="flex flex-col h-full">
@@ -1193,7 +1263,8 @@ function CartPanel({
       </div>
 
       {/* Sales/PIC section — always visible */}
-      <div className="px-3 py-2.5 border-b border-line flex-shrink-0">
+      <div className="px-3 py-2 border-b border-line flex-shrink-0">
+        <p className="text-[10px] font-semibold text-ink-400 uppercase tracking-widest mb-1.5">Sales / PIC</p>
         <SalesPicker
           staffList={staffList}
           salesStaffId={salesStaffId}
@@ -1202,19 +1273,6 @@ function CartPanel({
           inputCls={inputCls}
         />
       </div>
-
-      {/* Customer section — above items */}
-      {!isEmpty && (
-        <div className="px-3 pt-3 pb-2 border-b border-line flex-shrink-0">
-          <CustomerSearchInput
-            name={custName}
-            phone={custPhone}
-            onNameChange={setCustName}
-            onPhoneChange={setCustPhone}
-            inputCls={inputCls}
-          />
-        </div>
-      )}
 
       {/* Items list */}
       <div className="flex-1 overflow-y-auto px-3 py-2 space-y-1.5">
@@ -1241,10 +1299,17 @@ function CartPanel({
         {cart.map((item, idx) => (
           <div key={idx} className="flex items-start gap-2 bg-sand-50 rounded-lg px-3 py-2.5">
             <div className="flex-1 min-w-0">
-              <p className="text-[13px] font-medium text-ink-900 leading-snug">{item.product.name}</p>
-              {item.is_custom && item.customization_notes && (
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <p className="text-[13px] font-medium text-ink-900 leading-snug">{item.product.name}</p>
+                {item.size_ml && (
+                  <span className="text-[10px] font-semibold bg-pine-50 text-pine rounded-full px-1.5 py-0.5 shrink-0">
+                    {item.size_ml}ml
+                  </span>
+                )}
+              </div>
+              {item.is_custom && item.customization_notes && !item.size_ml && (
                 <p className="text-[11px] text-rust italic truncate mt-0.5">{item.customization_notes}</p>
-              )}
+)}
               <p className="text-[11px] text-ink-400 mt-0.5">{formatRp(item.unit_price)}</p>
             </div>
             <div className="flex items-center gap-1 flex-shrink-0">
@@ -1275,20 +1340,6 @@ function CartPanel({
       {!isEmpty && (
         <div className="border-t border-line px-3 pt-3 pb-4 bg-white flex-shrink-0 space-y-2">
 
-          {/* Driver */}
-          {drivers.length > 0 && (
-            <select
-              className="bg-sand-50 border border-line rounded-lg w-full px-3 py-2 text-[13px] text-ink-900 focus:outline-none focus:border-pine-400"
-              value={driverId}
-              onChange={e => setDriverId(e.target.value)}
-            >
-              <option value="">— Tanpa driver —</option>
-              {drivers.map(d => (
-                <option key={d.id} value={d.id}>{d.name} ({d.fee_value}%)</option>
-              ))}
-            </select>
-          )}
-
           {/* Discount */}
           <div className="flex items-center gap-2">
             <label className="text-[12px] text-ink-500 whitespace-nowrap">Diskon (Rp)</label>
@@ -1314,12 +1365,6 @@ function CartPanel({
                 <span className="tabular-nums">−{formatRp(discount)}</span>
               </div>
             )}
-            {selectedDriver && (
-              <div className="flex justify-between text-[12px] text-ink-400">
-                <span>Fee {selectedDriver.name} ({selectedDriver.fee_value}%)</span>
-                <span className="tabular-nums">{formatRp(Math.round(total * selectedDriver.fee_value / 100))}</span>
-              </div>
-            )}
             <div className="flex justify-between items-baseline pt-1.5 border-t border-line">
               <span className="text-[13px] font-semibold text-ink-700 uppercase tracking-wider">Total</span>
               <span className="text-[22px] font-bold text-ink-900 tabular-nums leading-none">{formatRp(total)}</span>
@@ -1327,11 +1372,6 @@ function CartPanel({
           </div>
 
           {/* Checkout CTA */}
-          {!isEmpty && !canCheckout && (
-            <p className="text-[11px] text-warning text-center mt-2">
-              ⚠ Isi nama &amp; nomor WhatsApp customer dulu
-            </p>
-          )}
           <button
             onClick={onCheckout}
             disabled={!canCheckout}
