@@ -81,7 +81,7 @@ function EmptyRanking({ letter }: { letter: string }) {
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export function DashboardClient({ staffName, branchId }: Props) {
-  const [range,      setRange]      = useState<Range>('month')
+  const [range,      setRange]      = useState<Range>('today')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo,   setCustomTo]   = useState('')
   const [showCustom, setShowCustom] = useState(false)

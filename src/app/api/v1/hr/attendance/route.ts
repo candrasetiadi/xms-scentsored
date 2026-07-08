@@ -209,7 +209,7 @@ export async function POST(request: Request) {
     .from('attendances')
     .upsert({
       staff_id:       body.staff_id,
-      branch_id:      target.branch_id,
+      branch_id:      target.branch_id ?? '',
       work_date:      body.date,
       clock_in:       clockIn,
       clock_out:      clockOut,

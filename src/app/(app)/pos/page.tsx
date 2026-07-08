@@ -28,22 +28,29 @@ export default async function PosPage({
 
   if (!branchId) redirect('/dashboard')
 
-  const [productsRes, variantsRes, productStockRes, edcRes, branchRes] = await Promise.all([
+  type VariantRow = { id: string; product_id: string; size_ml: number; price: number }
+
+  const [productsRes, productStockRes, edcRes, branchRes] = await Promise.all([
     supabase.from('products').select('id, sku, name, category, type, price, image_url').eq('active', true).order('name'),
-    supabase.from('product_variants').select('id, product_id, size_ml, price').eq('active', true).order('sort_order'),
     supabase.from('product_stock').select('product_id, current_stock').eq('branch_id', branchId),
     supabase.from('edc_machines').select('id, bank_name, terminal_id, label').eq('branch_id', branchId).eq('active', true).order('bank_name'),
     supabase.from('branches').select('qris_image_url').eq('id', branchId).single(),
   ])
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: variantsRaw } = await (supabase as any)
+    .from('product_variants')
+    .select('id, product_id, size_ml, price')
+    .eq('active', true)
+    .order('sort_order') as { data: VariantRow[] | null }
 
   const stockMap: Record<string, number> = {}
   for (const s of productStockRes.data ?? []) {
     stockMap[s.product_id] = s.current_stock
   }
 
-  // Group variants by product_id for easy lookup
   const variantMap: Record<string, { id: string; size_ml: number; price: number }[]> = {}
-  for (const v of variantsRes.data ?? []) {
+  for (const v of variantsRaw ?? []) {
     if (!variantMap[v.product_id]) variantMap[v.product_id] = []
     variantMap[v.product_id].push({ id: v.id, size_ml: v.size_ml, price: v.price })
   }
