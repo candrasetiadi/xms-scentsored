@@ -21,8 +21,6 @@ export async function GET(request: Request) {
     .eq('active', true)
     .single()
   if (!staff) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!['owner', 'admin'].includes(staff.role))
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { searchParams } = new URL(request.url)
   const slotId    = searchParams.get('slot_id')

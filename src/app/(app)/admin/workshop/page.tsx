@@ -8,18 +8,16 @@ export default async function WorkshopAdminPage() {
   if (!user) redirect('/login')
 
   const { data: staff } = await supabase
-    .from('staff').select('role, branch_id')
+    .from('staff').select('id')
     .eq('auth_user_id', user.id).eq('active', true).single()
 
-  if (!staff || !['owner', 'admin'].includes(staff.role)) redirect('/dashboard')
+  if (!staff) redirect('/dashboard')
 
   const { data: branches } = await supabase
     .from('branches').select('id, name').order('name')
 
   return (
     <WorkshopAdminClient
-      staffRole={staff.role}
-      branchId={staff.branch_id ?? null}
       branches={branches ?? []}
     />
   )

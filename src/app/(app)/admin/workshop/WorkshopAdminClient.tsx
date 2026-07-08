@@ -23,9 +23,7 @@ interface FormulationRow {
 }
 
 interface Props {
-  staffRole: string
-  branchId:  string | null
-  branches:  Branch[]
+  branches: Branch[]
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -39,26 +37,22 @@ const fmtGram = (n: number) => (Number(n) % 1 === 0 ? `${n}` : Number(n).toFixed
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
-export function WorkshopAdminClient({ staffRole, branchId, branches }: Props) {
-  const isOwner = staffRole === 'owner'
-
+export function WorkshopAdminClient({ branches: _branches }: Props) {
   const [rows,         setRows]         = useState<FormulationRow[]>([])
   const [loading,      setLoading]      = useState(true)
-  const [filterBranch, setFilterBranch] = useState(isOwner ? '' : (branchId ?? ''))
   const [filterStatus, setFilterStatus] = useState('')
 
   const fetchRows = useCallback(async () => {
     setLoading(true)
     try {
       const params = new URLSearchParams()
-      if (filterBranch) params.set('branch_id', filterBranch)
-      if (filterStatus) params.set('status',    filterStatus)
+      if (filterStatus) params.set('status', filterStatus)
       const res  = await fetch(`/api/v1/workshop/formulations?${params}`)
       const json = await res.json()
       setRows(json.data ?? [])
     } catch { /* silent */ }
     finally { setLoading(false) }
-  }, [filterBranch, filterStatus])
+  }, [filterStatus])
 
   useEffect(() => { fetchRows() }, [fetchRows])
 
@@ -72,11 +66,6 @@ export function WorkshopAdminClient({ staffRole, branchId, branches }: Props) {
         { value: 'finalized', label: 'Selesai' },
       ],
     },
-    ...(isOwner ? [{
-      key: 'branch', type: 'select' as const, label: 'Cabang', value: filterBranch,
-      onChange: setFilterBranch,
-      options: [{ value: '', label: 'Semua Cabang' }, ...branches.map(b => ({ value: b.id, label: b.name }))],
-    }] : []),
   ]
 
   return (
@@ -89,7 +78,7 @@ export function WorkshopAdminClient({ staffRole, branchId, branches }: Props) {
 
         <FilterBar
           fields={filterFields}
-          onReset={() => { setFilterBranch(isOwner ? '' : (branchId ?? '')); setFilterStatus('') }}
+          onReset={() => setFilterStatus('')}
         />
 
         {loading ? (
