@@ -120,7 +120,7 @@ export function FullShiftClient() {
       <div className="max-w-3xl mx-auto">
         {/* Header */}
         <div className="mb-5">
-          <h1 className="text-xl font-bold text-ink-900">Penunjukan Full Shift</h1>
+          <h1 className="font-display text-[28px] text-pine">Penunjukan Full Shift</h1>
           <p className="text-sm text-ink-400 mt-0.5">
             Tandai karyawan yang ditugaskan bekerja Full Shift pada tanggal tertentu.
             Bonus otomatis diberikan saat clock out jika jam kerja memenuhi syarat.

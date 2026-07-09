@@ -143,7 +143,7 @@ export function ReportingClient({ defaultBranchId, branches }: Props) {
   return (
     <div className="max-w-5xl mx-auto px-4 py-6 space-y-5">
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <h1 className="text-xl font-semibold text-ink-900">Laporan</h1>
+        <h1 className="font-display text-[28px] text-pine">Laporan</h1>
 
         {/* Filters */}
         <div className="flex items-center gap-2 flex-wrap">

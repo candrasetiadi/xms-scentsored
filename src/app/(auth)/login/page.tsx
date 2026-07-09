@@ -11,7 +11,7 @@ export default function LoginPage() {
           <BrandLogo variant="light" size="lg" />
         </div>
         <div className="bg-white border border-line rounded-lg shadow-sm p-8">
-          <h1 className="text-[22px] font-semibold text-ink-900 mb-1">Masuk</h1>
+          <h1 className="font-display text-[28px] text-pine mb-1">Masuk</h1>
           <p className="text-sm text-ink-500 mb-6">Sistem operasional Scentsored</p>
           <LoginForm />
         </div>

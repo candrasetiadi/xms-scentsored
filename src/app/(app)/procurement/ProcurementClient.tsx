@@ -376,7 +376,7 @@ export function ProcurementClient({ staffId: _staffId, staffRole, branchId: init
       {/* Header */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-xl font-semibold text-ink-900">Procurement</h1>
+          <h1 className="font-display text-[28px] text-pine">Procurement</h1>
           <p className="text-sm text-ink-400 mt-0.5">Purchase order bahan baku</p>
         </div>
         <div className="flex items-center gap-2">

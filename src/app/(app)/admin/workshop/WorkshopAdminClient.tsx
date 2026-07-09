@@ -121,7 +121,7 @@ export function WorkshopAdminClient({ initialRows }: Props) {
     <div className="bg-sand-50 min-h-full p-4 md:p-6">
       <div className="max-w-5xl mx-auto">
         <div className="flex items-center justify-between mb-4">
-          <h1 className="text-xl font-bold text-ink-900">Formulasi Workshop</h1>
+          <h1 className="font-display text-[28px] text-pine">Formulasi Workshop</h1>
           <div className="flex items-center gap-3">
             <span className="text-sm text-ink-500">{rows.length} formulasi</span>
             <button

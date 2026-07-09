@@ -9,7 +9,7 @@ export default async function TravelAgenciesPage() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-xl font-semibold text-ink-900">Perusahaan / Travel Agent</h1>
+        <h1 className="font-display text-[28px] text-pine">Perusahaan / Travel Agent</h1>
         <p className="text-sm text-ink-500 mt-1">Daftarkan perusahaan yang mengirim driver. Komisi perusahaan dihitung otomatis saat transaksi.</p>
       </div>
       <TravelAgenciesClient initialData={data ?? []} />

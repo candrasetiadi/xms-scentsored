@@ -123,7 +123,7 @@ export function DriversClient({ staffRole }: { staffRole: string }) {
   return (
     <div className="min-h-screen" style={{ background: 'var(--color-surface)' }}>
       <div className="max-w-6xl mx-auto px-4 py-6 space-y-4">
-        <h1 className="text-xl font-semibold" style={{ color: 'var(--color-text-primary)' }}>Driver & Fee</h1>
+        <h1 className="font-display text-[28px] text-pine">Driver & Fee</h1>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Kiri: list driver */}

@@ -164,7 +164,7 @@ export function StaffClient({ initialStaff, branches }: Props) {
     <div className="bg-sand-50 min-h-full p-4 md:p-6">
       {/* Page header */}
       <div className="mb-6">
-        <h2 className="text-lg font-semibold text-ink-900">Data Karyawan</h2>
+        <h2 className="font-display text-[28px] text-pine">Data Karyawan</h2>
         <p className="text-sm text-ink-400 mt-0.5">
           {staff.length} karyawan · {activeCount} aktif
           {inactiveCount > 0 && ` · ${inactiveCount} nonaktif`}
