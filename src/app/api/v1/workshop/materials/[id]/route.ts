@@ -88,3 +88,38 @@ export async function PATCH(
 
   return NextResponse.json({ data })
 }
+
+// DELETE /api/v1/workshop/materials/[id]
+// Soft-delete (active = false). Manager only.
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const supabase = await createClient()
+  const { data: { user }, error: authErr } = await supabase.auth.getUser()
+  if (authErr || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { data: staff } = await supabase
+    .from('staff')
+    .select('role')
+    .eq('auth_user_id', user.id)
+    .eq('active', true)
+    .single()
+  if (!staff) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!['owner', 'admin'].includes(staff.role))
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+  const { id } = await params
+  if (!UUID_RE.test(id))
+    return NextResponse.json({ error: 'id harus UUID valid.' }, { status: 400 })
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = supabase as any
+  const { error } = await db
+    .from('workshop_materials')
+    .update({ active: false })
+    .eq('id', id)
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ success: true })
+}

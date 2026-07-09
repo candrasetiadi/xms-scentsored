@@ -10,7 +10,7 @@ interface Product {
   type: 'ready_stock' | 'custom_racik'; price: number; image_url: string | null
 }
 
-interface ProductVariant { id: string; size_ml: number; price: number }
+interface ProductVariant { id: string; size_ml: number; price: number; label: string | null }
 
 interface StaffMember { id: string; name: string; role: string }
 
@@ -576,7 +576,7 @@ export function PosClient({
                         {v.size_ml}
                       </span>
                       <div className="text-left">
-                        <p className="text-[14px] font-semibold text-ink-900">{v.size_ml} ml</p>
+                        <p className="text-[14px] font-semibold text-ink-900">{v.label ?? `${v.size_ml} mL`}</p>
                         {v.price === 0 && <p className="text-[11px] text-ink-400">Harga belum diset</p>}
                       </div>
                     </div>

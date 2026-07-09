@@ -28,7 +28,7 @@ export default async function PosPage({
 
   if (!branchId) redirect('/dashboard')
 
-  type VariantRow = { id: string; product_id: string; size_ml: number; price: number }
+  type VariantRow = { id: string; product_id: string; size_ml: number; price: number; label: string | null }
 
   const [productsRes, productStockRes, edcRes, branchRes] = await Promise.all([
     supabase.from('products').select('id, sku, name, category, type, price, image_url').eq('active', true).order('name'),
@@ -40,7 +40,7 @@ export default async function PosPage({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: variantsRaw } = await (supabase as any)
     .from('product_variants')
-    .select('id, product_id, size_ml, price')
+    .select('id, product_id, size_ml, price, label')
     .eq('active', true)
     .order('sort_order') as { data: VariantRow[] | null }
 
@@ -49,10 +49,10 @@ export default async function PosPage({
     stockMap[s.product_id] = s.current_stock
   }
 
-  const variantMap: Record<string, { id: string; size_ml: number; price: number }[]> = {}
+  const variantMap: Record<string, { id: string; size_ml: number; price: number; label: string | null }[]> = {}
   for (const v of variantsRaw ?? []) {
     if (!variantMap[v.product_id]) variantMap[v.product_id] = []
-    variantMap[v.product_id].push({ id: v.id, size_ml: v.size_ml, price: v.price })
+    variantMap[v.product_id].push({ id: v.id, size_ml: v.size_ml, price: v.price, label: v.label })
   }
 
   return (
