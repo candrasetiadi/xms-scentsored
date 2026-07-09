@@ -206,7 +206,7 @@ export function SlotsClient({ branches, defaultBranchId }: { branches: Branch[];
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-5 items-start">
 
           {/* Slot list */}
           <div className="md:col-span-2 space-y-4">
@@ -268,7 +268,7 @@ export function SlotsClient({ branches, defaultBranchId }: { branches: Branch[];
           </div>
 
           {/* Booking detail */}
-          <div className="md:col-span-3">
+          <div className="md:col-span-3 md:sticky md:top-14 md:max-h-[calc(100vh-4rem)] md:overflow-y-auto md:rounded-xl">
             {!selSlot ? (
               <div className="bg-white border border-line rounded-xl p-10 text-center h-full flex flex-col items-center justify-center gap-2">
                 <svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-ink-300">
