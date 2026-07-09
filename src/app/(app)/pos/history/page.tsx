@@ -33,7 +33,7 @@ export default async function OrderHistoryPage({
 
   let query = supabase
     .from('orders')
-    .select('id, order_number, queue_number, status, subtotal, discount, total, paid_at, created_at, customer_id, driver_id')
+    .select('id, order_number, queue_number, status, subtotal, discount, total, paid_at, created_at, customer_id, driver_id, sales_staff_id')
     .eq('branch_id', branchId)
     .gte('created_at', `${selectedDate}T00:00:00+07:00`)
     .lt('created_at',  `${selectedDate}T23:59:59+07:00`)
@@ -44,16 +44,24 @@ export default async function OrderHistoryPage({
 
   const { data: orders } = await query
 
-  // Ambil nama customer untuk orders yang ada customer_id
-  const custIds = [...new Set((orders ?? []).map(o => o.customer_id).filter(Boolean) as string[])]
-  const { data: customers } = custIds.length
-    ? await supabase.from('customers').select('id, name, phone').in('id', custIds)
-    : { data: [] }
-  const custMap = new Map((customers ?? []).map(c => [c.id, c]))
+  // Fetch customers + sales staff in parallel
+  const custIds  = [...new Set((orders ?? []).map(o => o.customer_id).filter(Boolean) as string[])]
+  const salesIds = [...new Set((orders ?? []).map(o => o.sales_staff_id).filter(Boolean) as string[])]
+
+  const [{ data: customers }, { data: salesStaff }] = await Promise.all([
+    custIds.length  ? supabase.from('customers').select('id, name, phone').in('id', custIds)  : Promise.resolve({ data: [] }),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    salesIds.length ? (supabase as any).from('staff').select('id, name, nickname').in('id', salesIds) : Promise.resolve({ data: [] }),
+  ])
+
+  const custMap  = new Map((customers  ?? []).map((c: { id: string; name: string | null; phone: string | null }) => [c.id, c]))
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const staffMap = new Map(((salesStaff ?? []) as any[]).map((s: { id: string; name: string; nickname: string | null }) => [s.id, s]))
 
   const enriched = (orders ?? []).map(o => ({
     ...o,
-    customer: o.customer_id ? custMap.get(o.customer_id) ?? null : null,
+    customer:    o.customer_id    ? custMap.get(o.customer_id)       ?? null : null,
+    sales_staff: o.sales_staff_id ? staffMap.get(o.sales_staff_id)   ?? null : null,
   }))
 
   // Summary hari ini
@@ -65,7 +73,8 @@ export default async function OrderHistoryPage({
       staffRole={staff.role}
       branchId={branchId}
       branches={branches ?? []}
-      orders={enriched}
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    orders={enriched as any}
       selectedDate={selectedDate}
       statusFilter={statusFilter}
       summary={{ totalOrders: paid.length, revenue }}
