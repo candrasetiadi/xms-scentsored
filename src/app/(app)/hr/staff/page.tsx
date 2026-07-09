@@ -14,7 +14,7 @@ export default async function StaffPage() {
   if (!me || !['owner', 'admin'].includes(me.role)) redirect('/hr')
 
   const [{ data: staffList }, { data: branches }] = await Promise.all([
-    supabase.from('staff').select('id, name, role, active, branch_id').order('name'),
+    supabase.from('staff').select('id, name, nickname, team, job_title, role, active, branch_id').order('name'),
     supabase.from('branches').select('id, name').eq('active', true).order('name'),
   ])
 

@@ -22,7 +22,7 @@ export async function GET() {
 
   const { data, error } = await ctx.supabase
     .from('staff')
-    .select('id, name, role, active, branch_id, branches(id, name)')
+    .select('id, name, nickname, team, job_title, role, active, branch_id, branches(id, name)')
     .order('name')
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -41,6 +41,9 @@ export async function POST(request: Request) {
     password: string
     role: string
     branch_id: string | null
+    nickname?: string | null
+    team?: string | null
+    job_title?: string | null
   }
 
   if (!body.name?.trim()) return NextResponse.json({ error: 'Nama wajib diisi.' }, { status: 400 })
@@ -66,12 +69,15 @@ export async function POST(request: Request) {
     .from('staff')
     .insert({
       auth_user_id: authData.user.id,
-      name: body.name.trim(),
-      role: body.role as 'owner' | 'admin' | 'cashier' | 'perfumer' | 'stock_keeper',
+      name:      body.name.trim(),
+      role:      body.role as 'owner' | 'admin' | 'cashier' | 'perfumer' | 'stock_keeper',
       branch_id: body.branch_id || null,
-      active: true,
+      nickname:  body.nickname?.trim() || null,
+      team:      body.team || null,
+      job_title: body.job_title?.trim() || null,
+      active:    true,
     })
-    .select('id, name, role, active, branch_id')
+    .select('id, name, nickname, team, job_title, role, active, branch_id')
     .single()
 
   if (staffErr) {

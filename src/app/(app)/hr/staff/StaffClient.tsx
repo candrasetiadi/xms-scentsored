@@ -8,16 +8,19 @@ import { Modal } from '@/components/ui/Modal'
 
 interface Branch { id: string; name: string }
 interface StaffMember {
-  id: string
-  name: string
-  role: string
-  active: boolean
+  id:        string
+  name:      string
+  nickname:  string | null
+  team:      string | null
+  job_title: string | null
+  role:      string
+  active:    boolean
   branch_id: string | null
 }
 
 interface Props {
   initialStaff: StaffMember[]
-  branches: Branch[]
+  branches:     Branch[]
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -35,7 +38,19 @@ const ROLE_COLOR: Record<string, string> = {
   stock_keeper: 'bg-sand-100 text-ink-600 border-line',
 }
 
-const EMPTY_FORM = { name: '', email: '', password: '', role: 'cashier', branch_id: '' }
+const TEAM_COLOR: Record<string, string> = {
+  SALES: 'bg-sky-50 text-sky-700 border-sky-200',
+  RACIK: 'bg-amber-50 text-amber-700 border-amber-200',
+  FLOOR: 'bg-green-50 text-green-700 border-green-200',
+  OFFICE: 'bg-purple-50 text-purple-700 border-purple-200',
+}
+
+const TEAMS = ['SALES', 'RACIK', 'FLOOR', 'OFFICE']
+
+const EMPTY_FORM = {
+  name: '', email: '', password: '', role: 'cashier', branch_id: '',
+  nickname: '', team: '', job_title: '',
+}
 
 // ── Field wrapper ──────────────────────────────────────────────────────────────
 
@@ -54,6 +69,7 @@ export function StaffClient({ initialStaff, branches }: Props) {
   const router = useRouter()
   const [staff, setStaff]     = useState(initialStaff)
   const [search, setSearch]   = useState('')
+  const [teamFilter, setTeamFilter] = useState('')
   const [modalOpen, setModal] = useState(false)
   const [editing, setEditing] = useState<StaffMember | null>(null)
   const [form, setForm]       = useState(EMPTY_FORM)
@@ -62,10 +78,16 @@ export function StaffClient({ initialStaff, branches }: Props) {
 
   const branchMap = Object.fromEntries(branches.map(b => [b.id, b.name]))
 
-  const filtered = staff.filter(s =>
-    s.name.toLowerCase().includes(search.toLowerCase()) ||
-    ROLE_LABEL[s.role]?.toLowerCase().includes(search.toLowerCase())
-  )
+  const filtered = staff.filter(s => {
+    const q = search.toLowerCase()
+    const matchSearch = !q ||
+      s.name.toLowerCase().includes(q) ||
+      (s.nickname ?? '').toLowerCase().includes(q) ||
+      (s.job_title ?? '').toLowerCase().includes(q) ||
+      ROLE_LABEL[s.role]?.toLowerCase().includes(q)
+    const matchTeam = !teamFilter || s.team === teamFilter
+    return matchSearch && matchTeam
+  })
 
   const activeCount   = staff.filter(s => s.active).length
   const inactiveCount = staff.length - activeCount
@@ -76,7 +98,10 @@ export function StaffClient({ initialStaff, branches }: Props) {
 
   function openEdit(s: StaffMember) {
     setEditing(s)
-    setForm({ name: s.name, email: '', password: '', role: s.role, branch_id: s.branch_id ?? '' })
+    setForm({
+      name: s.name, email: '', password: '', role: s.role, branch_id: s.branch_id ?? '',
+      nickname: s.nickname ?? '', team: s.team ?? '', job_title: s.job_title ?? '',
+    })
     setError(null); setModal(true)
   }
 
@@ -92,7 +117,14 @@ export function StaffClient({ initialStaff, branches }: Props) {
         const res = await fetch(`/api/v1/hr/staff/${editing.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: form.name, role: form.role, branch_id: form.branch_id || null }),
+          body: JSON.stringify({
+            name:      form.name,
+            role:      form.role,
+            branch_id: form.branch_id || null,
+            nickname:  form.nickname || null,
+            team:      form.team || null,
+            job_title: form.job_title || null,
+          }),
         })
         const json = await res.json()
         if (!res.ok) { setError(json.error ?? 'Gagal menyimpan.'); return }
@@ -104,6 +136,7 @@ export function StaffClient({ initialStaff, branches }: Props) {
           body: JSON.stringify({
             name: form.name, email: form.email, password: form.password,
             role: form.role, branch_id: form.branch_id || null,
+            nickname: form.nickname || null, team: form.team || null, job_title: form.job_title || null,
           }),
         })
         const json = await res.json()
@@ -140,7 +173,7 @@ export function StaffClient({ initialStaff, branches }: Props) {
 
       {/* Toolbar */}
       <div className="flex items-center gap-3 mb-5 flex-wrap">
-        <div className="relative flex-1 min-w-[200px]">
+        <div className="relative flex-1 min-w-[180px]">
           <svg
             className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-400 pointer-events-none"
             width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.75"
@@ -148,12 +181,20 @@ export function StaffClient({ initialStaff, branches }: Props) {
             <circle cx="6.5" cy="6.5" r="4.5"/><path d="M10.5 10.5l3 3" strokeLinecap="round"/>
           </svg>
           <input
-            placeholder="Cari nama atau role…"
+            placeholder="Cari nama, nick, jabatan…"
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="w-full h-11 rounded-lg border border-line-strong pl-10 pr-4 text-sm text-ink-900 bg-white focus:outline-none focus:border-pine-400 focus:ring-2 focus:ring-pine-100 transition-colors"
           />
         </div>
+        <select
+          value={teamFilter}
+          onChange={e => setTeamFilter(e.target.value)}
+          className="h-11 rounded-lg border border-line-strong px-3 text-sm text-ink-900 bg-white focus:outline-none focus:border-pine-400 focus:ring-2 focus:ring-pine-100 transition-colors"
+        >
+          <option value="">Semua Tim</option>
+          {TEAMS.map(t => <option key={t} value={t}>{t}</option>)}
+        </select>
         <button
           onClick={openCreate}
           className="h-11 px-5 rounded-lg bg-pine text-white text-sm font-semibold hover:bg-pine-700 active:scale-[0.98] transition-all shrink-0 flex items-center gap-2"
@@ -170,9 +211,10 @@ export function StaffClient({ initialStaff, branches }: Props) {
         <table className="w-full">
           <thead>
             <tr className="border-b border-line bg-sand-50">
-              <th className="px-5 py-3.5 text-left text-xs font-semibold text-ink-500 uppercase tracking-wider">Nama</th>
+              <th className="px-5 py-3.5 text-left text-xs font-semibold text-ink-500 uppercase tracking-wider">Karyawan</th>
+              <th className="px-5 py-3.5 text-left text-xs font-semibold text-ink-500 uppercase tracking-wider hidden md:table-cell">Tim</th>
               <th className="px-5 py-3.5 text-left text-xs font-semibold text-ink-500 uppercase tracking-wider">Role</th>
-              <th className="px-5 py-3.5 text-left text-xs font-semibold text-ink-500 uppercase tracking-wider hidden md:table-cell">Cabang</th>
+              <th className="px-5 py-3.5 text-left text-xs font-semibold text-ink-500 uppercase tracking-wider hidden lg:table-cell">Cabang</th>
               <th className="px-5 py-3.5 text-center text-xs font-semibold text-ink-500 uppercase tracking-wider">Status</th>
               <th className="px-5 py-3.5" />
             </tr>
@@ -180,23 +222,46 @@ export function StaffClient({ initialStaff, branches }: Props) {
           <tbody className="divide-y divide-line">
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-5 py-16 text-center">
+                <td colSpan={6} className="px-5 py-16 text-center">
                   <p className="text-sm text-ink-400">
-                    {search ? `Tidak ada hasil untuk "${search}"` : 'Belum ada karyawan.'}
+                    {search || teamFilter ? 'Tidak ada hasil yang cocok.' : 'Belum ada karyawan.'}
                   </p>
                 </td>
               </tr>
             )}
             {filtered.map(s => (
               <tr key={s.id} className="hover:bg-sand-50/60 transition-colors group">
-                {/* Nama */}
+                {/* Karyawan: avatar + nama + nick + jabatan */}
                 <td className="px-5 py-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-pine-100 text-pine flex items-center justify-center text-sm font-semibold shrink-0 select-none">
-                      {s.name.charAt(0).toUpperCase()}
+                    <div className="relative shrink-0">
+                      <div className="w-9 h-9 rounded-full bg-pine-100 text-pine flex items-center justify-center text-sm font-bold select-none">
+                        {(s.nickname ?? s.name).charAt(0).toUpperCase()}
+                      </div>
+                      {s.nickname && (
+                        <span className="absolute -bottom-1 -right-1 text-[9px] font-bold bg-pine text-white rounded px-0.5 leading-tight">
+                          {s.nickname}
+                        </span>
+                      )}
                     </div>
-                    <span className="font-medium text-sm text-ink-900">{s.name}</span>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-sm text-ink-900 truncate">{s.name}</p>
+                      {s.job_title && (
+                        <p className="text-xs text-ink-400 truncate mt-0.5">{s.job_title}</p>
+                      )}
+                    </div>
                   </div>
+                </td>
+
+                {/* Tim */}
+                <td className="px-5 py-4 hidden md:table-cell">
+                  {s.team ? (
+                    <span className={`inline-flex text-xs px-2.5 py-1 rounded-full font-semibold border ${TEAM_COLOR[s.team] ?? 'bg-sand-100 text-ink-600 border-line'}`}>
+                      {s.team}
+                    </span>
+                  ) : (
+                    <span className="text-ink-300 text-xs">—</span>
+                  )}
                 </td>
 
                 {/* Role */}
@@ -207,7 +272,7 @@ export function StaffClient({ initialStaff, branches }: Props) {
                 </td>
 
                 {/* Cabang */}
-                <td className="px-5 py-4 text-sm text-ink-500 hidden md:table-cell">
+                <td className="px-5 py-4 text-sm text-ink-500 hidden lg:table-cell">
                   {s.branch_id ? branchMap[s.branch_id] : <span className="text-ink-300">Semua cabang</span>}
                 </td>
 
@@ -241,7 +306,6 @@ export function StaffClient({ initialStaff, branches }: Props) {
           </tbody>
         </table>
 
-        {/* Footer count */}
         {filtered.length > 0 && (
           <div className="px-5 py-3 border-t border-line bg-sand-50 text-xs text-ink-400">
             Menampilkan {filtered.length} dari {staff.length} karyawan
@@ -256,13 +320,44 @@ export function StaffClient({ initialStaff, branches }: Props) {
         title={editing ? 'Edit Karyawan' : 'Tambah Karyawan'}
       >
         <div className="flex flex-col gap-5">
-          <Field label="Nama *">
+          <Field label="Nama Lengkap *">
             <input
               className={inp}
               value={form.name}
               onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
               placeholder="Budi Santoso"
               autoFocus
+            />
+          </Field>
+
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Nickname">
+              <input
+                className={inp}
+                value={form.nickname}
+                onChange={e => setForm(f => ({ ...f, nickname: e.target.value.toUpperCase() }))}
+                placeholder="BUDI"
+                maxLength={10}
+              />
+            </Field>
+            <Field label="Tim">
+              <select
+                className={inp}
+                value={form.team}
+                onChange={e => setForm(f => ({ ...f, team: e.target.value }))}
+              >
+                <option value="">— Pilih Tim —</option>
+                {TEAMS.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </Field>
+          </div>
+
+          <Field label="Jabatan">
+            <input
+              className={inp}
+              value={form.job_title}
+              onChange={e => setForm(f => ({ ...f, job_title: e.target.value }))}
+              placeholder="Olfactory Consultant"
             />
           </Field>
 

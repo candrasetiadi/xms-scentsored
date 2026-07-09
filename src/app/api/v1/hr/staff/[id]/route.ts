@@ -31,11 +31,22 @@ export async function PATCH(
     branch_id?: string | null
     active?: boolean
     sales_fee_pct?: number
+    nickname?: string | null
+    team?: string | null
+    job_title?: string | null
   }
 
   const VALID_ROLES = ['owner', 'admin', 'cashier', 'perfumer', 'stock_keeper']
+  const VALID_TEAMS = ['SALES', 'RACIK', 'FLOOR', 'OFFICE']
   const updates: Record<string, unknown> = {}
-  if (body.name !== undefined) updates.name = body.name.trim()
+  if (body.name !== undefined)      updates.name      = body.name.trim()
+  if (body.nickname !== undefined)  updates.nickname  = body.nickname?.trim() || null
+  if (body.team !== undefined) {
+    if (body.team !== null && !VALID_TEAMS.includes(body.team))
+      return NextResponse.json({ error: 'Team tidak valid.' }, { status: 400 })
+    updates.team = body.team || null
+  }
+  if (body.job_title !== undefined) updates.job_title = body.job_title?.trim() || null
   if (body.role !== undefined) {
     if (!VALID_ROLES.includes(body.role))
       return NextResponse.json({ error: 'Role tidak valid.' }, { status: 400 })
@@ -58,7 +69,7 @@ export async function PATCH(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .update(updates as any)
     .eq('id', id)
-    .select('id, name, role, active, branch_id, branches(id, name)')
+    .select('id, name, nickname, team, job_title, role, active, branch_id, branches(id, name)')
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
