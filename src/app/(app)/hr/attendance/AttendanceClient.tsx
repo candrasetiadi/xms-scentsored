@@ -115,6 +115,7 @@ export function AttendanceClient({ staffId }: Props) {
   const [submitting,  setSubmitting]  = useState(false)
   const [geoLoading,  setGeoLoading]  = useState(false)
   const [showClockOutConfirm, setShowClockOutConfirm] = useState(false)
+  const [isFullShiftDesignated, setIsFullShiftDesignated] = useState(false)
 
   const fetchData = useCallback(async () => {
     setError(null)
@@ -132,6 +133,18 @@ export function AttendanceClient({ staffId }: Props) {
   }, [])
 
   useEffect(() => { fetchData() }, [fetchData])
+
+  useEffect(() => {
+    if (!staffId) return
+    const date = new Date().toISOString().slice(0, 10)
+    fetch(`/api/v1/hr/full-shift-designations?date=${date}`)
+      .then(r => r.json())
+      .then(json => {
+        const found = (json.data ?? []).find((s: { id: string; is_designated: boolean }) => s.id === staffId)
+        setIsFullShiftDesignated(found?.is_designated ?? false)
+      })
+      .catch(() => {})
+  }, [staffId])
 
   function getLocation(): Promise<{ latitude: number; longitude: number }> {
     return new Promise((resolve, reject) => {
@@ -240,6 +253,14 @@ export function AttendanceClient({ staffId }: Props) {
         {/* Status card */}
         {loading ? <StatusCardSkeleton /> : (
           <div className="bg-white border border-line rounded-2xl p-6 shadow-sm mb-6">
+
+            {/* Full shift designation notice */}
+            {isFullShiftDesignated && !clockedOut && (
+              <div className="flex items-center gap-2 bg-pine-50 border border-pine/20 rounded-xl px-3 py-2 mb-4">
+                <span className="text-pine text-sm">⏱</span>
+                <p className="text-xs font-medium text-pine">Kamu dijadwalkan Full Shift hari ini. Bonus otomatis dihitung saat clock out.</p>
+              </div>
+            )}
 
             {/* Shift info */}
             <div className="flex items-center justify-between mb-4">

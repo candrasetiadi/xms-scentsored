@@ -15,7 +15,7 @@ function OvertimeIcon() { return <svg width="16" height="16" viewBox="0 0 16 16"
 function LeaveIcon()    { return <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="2" y="4" width="12" height="10" rx="1"/><path d="M5 2v3M11 2v3M2 8h12"/></svg> }
 function PayslipIcon()  { return <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="2" width="10" height="12" rx="1"/><path d="M5 6h6M5 9h4M5 12h3"/></svg> }
 function UsersIcon()    { return <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="6" cy="5" r="2.5"/><path d="M1 14c0-2.8 2.2-5 5-5s5 2.2 5 5"/><circle cx="12" cy="5" r="2"/><path d="M14 13c0-1.7-1.2-3.2-3-3.7"/></svg> }
-function ShiftIcon()    { return <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="1" y="3" width="14" height="10" rx="1"/><path d="M1 7h14M5 3v10M11 3v10"/></svg> }
+function FullShiftIcon(){ return <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 2"/><path d="M11 2l2 2M5 2L3 4"/></svg> }
 function SalaryIcon()   { return <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M8 5v1.5M8 9.5V11M6.5 7A1.5 1.5 0 0 1 8 5.5h0A1.5 1.5 0 0 1 9.5 7h0A1.5 1.5 0 0 1 8 8.5h0A1.5 1.5 0 0 1 9.5 10"/></svg> }
 function PayrollIcon()  { return <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 4h12M2 8h8M2 12h5"/><path d="M11 9l2 2 3-3"/></svg> }
 function SettingIcon()  { return <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="2.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3 3l1.4 1.4M11.6 11.6L13 13M3 13l1.4-1.4M11.6 4.4L13 3"/></svg> }
@@ -32,7 +32,7 @@ const ADMIN_ITEMS: NavItem[] = [
   { label: 'Karyawan',       href: '/hr/staff',            icon: <UsersIcon />,   admin: true },
   { label: 'Rekap Absensi', href: '/hr/attendance/admin', icon: <ClockIcon />,   admin: true },
   { label: 'Cuti',           href: '/hr/leave',             icon: <LeaveIcon />,  admin: true },
-  { label: 'Shift & Jadwal',href: '/hr/shifts',            icon: <ShiftIcon />,  admin: true },
+  { label: 'Full Shift',     href: '/hr/full-shift',        icon: <FullShiftIcon />, admin: true },
   { label: 'Komponen Gaji', href: '/hr/salary',            icon: <SalaryIcon />, admin: true },
   { label: 'Payroll',        href: '/hr/payroll',           icon: <PayrollIcon />,admin: true },
   { label: 'Vendor',         href: '/hr/vendors',           icon: <VendorIcon />, admin: true },
