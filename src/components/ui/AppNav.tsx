@@ -19,7 +19,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Komisi',      href: '/admin/commissions',   roles: ['owner', 'admin'] },
   { label: 'Laporan',     href: '/reporting',           roles: ['owner', 'admin'] },
   { label: 'Custom Perfume Schedule', href: '/admin/slots', roles: ['owner', 'admin'] },
-  { label: 'Master Data', href: '/admin/products',   roles: ['owner', 'admin'] },
+  { label: 'Master Data', href: '/admin/products',   roles: ['owner', 'admin', 'stock_keeper'] },
   { label: 'Workshop',    href: '/admin/workshop',   roles: ['owner', 'admin', 'cashier', 'perfumer', 'stock_keeper'] },
   { label: 'SDM',         href: '/hr',               roles: ['owner', 'admin', 'cashier', 'perfumer', 'stock_keeper'] },
 ]

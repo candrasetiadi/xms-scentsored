@@ -3,22 +3,32 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
-const ADMIN_NAV = [
-  { label: 'Produk',                 href: '/admin/products' },
-  { label: 'Bahan Baku',             href: '/admin/raw-materials' },
-  { label: 'Raw Materials Workshop', href: '/admin/workshop-materials' },
-  { label: 'Resep / BOM',            href: '/admin/recipes' },
-  { label: 'Supplier',               href: '/admin/suppliers' },
-  { label: 'Driver',                 href: '/admin/drivers' },
-  { label: 'Travel Agent',           href: '/admin/travel-agencies' },
-  { label: 'Pelanggan',              href: '/admin/customers' },
+type Role = string
+
+interface NavEntry {
+  label: string
+  href: string
+  roles: Role[]
+}
+
+const ADMIN_NAV: NavEntry[] = [
+  { label: 'Produk',                 href: '/admin/products',           roles: ['owner', 'admin'] },
+  { label: 'Bahan Baku',             href: '/admin/raw-materials',      roles: ['owner', 'admin'] },
+  { label: 'Raw Materials Workshop', href: '/admin/workshop-materials', roles: ['owner', 'admin', 'stock_keeper'] },
+  { label: 'Resep / BOM',            href: '/admin/recipes',            roles: ['owner', 'admin'] },
+  { label: 'Supplier',               href: '/admin/suppliers',          roles: ['owner', 'admin'] },
+  { label: 'Driver',                 href: '/admin/drivers',            roles: ['owner', 'admin'] },
+  { label: 'Travel Agent',           href: '/admin/travel-agencies',    roles: ['owner', 'admin'] },
+  { label: 'Pelanggan',              href: '/admin/customers',          roles: ['owner', 'admin'] },
 ]
 
-export function AdminSubNav() {
+export function AdminSubNav({ role }: { role: Role }) {
   const pathname = usePathname()
+  const visible = ADMIN_NAV.filter(item => item.roles.includes(role))
+
   return (
     <nav className="flex gap-1 flex-wrap mb-6 border-b border-line pb-3">
-      {ADMIN_NAV.map(item => {
+      {visible.map(item => {
         const active = pathname === item.href || pathname.startsWith(item.href + '/')
         return (
           <Link
