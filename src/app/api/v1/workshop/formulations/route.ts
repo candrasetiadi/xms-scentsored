@@ -1,5 +1,6 @@
-import { createClient } from '@/lib/supabase/server'
-import { NextResponse } from 'next/server'
+import { createClient }      from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { NextResponse }      from 'next/server'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -14,7 +15,8 @@ export async function GET(request: Request) {
   const { data: { user }, error: authErr } = await supabase.auth.getUser()
   if (authErr || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { data: staff } = await supabase
+  const admin = createAdminClient()
+  const { data: staff } = await admin
     .from('staff')
     .select('role, branch_id')
     .eq('auth_user_id', user.id)
@@ -36,7 +38,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'date harus format YYYY-MM-DD.' }, { status: 400 })
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = supabase as any
+  const db = admin as any
   let query = db
     .from('workshop_formulations')
     .select(`

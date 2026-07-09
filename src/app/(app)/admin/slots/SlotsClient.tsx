@@ -30,10 +30,10 @@ function fmtDate(d: string) {
 function fmtRp(n: number) { return 'Rp ' + _numFmt.format(Math.round(n)) }
 
 const DEFAULT_SESSIONS = [
-  { start_time: '09:00', end_time: '10:30', label: 'Sesi 1' },
-  { start_time: '12:00', end_time: '13:30', label: 'Sesi 2' },
-  { start_time: '15:00', end_time: '16:30', label: 'Sesi 3' },
-  { start_time: '18:00', end_time: '19:30', label: 'Sesi 4' },
+  { start_time: '09:00', end_time: '11:00', label: 'Sesi 1' },
+  { start_time: '12:00', end_time: '15:00', label: 'Sesi 2' },
+  { start_time: '15:00', end_time: '18:00', label: 'Sesi 3' },
+  { start_time: '18:00', end_time: '21:00', label: 'Sesi 4' },
 ]
 
 function todayStr() { return new Date().toISOString().slice(0, 10) }
@@ -64,7 +64,7 @@ export function SlotsClient({ branches, defaultBranchId }: { branches: Branch[];
 
   // Modal: buat slot satuan
   const [showCreate,  setShowCreate]  = useState(false)
-  const [form,        setForm]        = useState({ date: '', start_time: '09:00', end_time: '10:30', max_bookings: 16, notes: '' })
+  const [form,        setForm]        = useState({ date: '', start_time: '09:00', end_time: '11:00', max_bookings: 16, notes: '' })
   const [formPrice,   setFormPrice]   = useState('0')
   const [creating,    setCreating]    = useState(false)
   const [createErr,   setCreateErr]   = useState('')
@@ -117,7 +117,7 @@ export function SlotsClient({ branches, defaultBranchId }: { branches: Branch[];
     setCreating(false)
     if (!res.ok) { setCreateErr(json.error?.message ?? 'Gagal.'); return }
     setShowCreate(false)
-    setForm({ date: '', start_time: '09:00', end_time: '10:30', max_bookings: 16, notes: '' })
+    setForm({ date: '', start_time: '09:00', end_time: '11:00', max_bookings: 16, notes: '' })
     setFormPrice('0')
     loadSlots()
   }
@@ -379,7 +379,7 @@ export function SlotsClient({ branches, defaultBranchId }: { branches: Branch[];
           <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden">
             <div className="px-6 py-4 border-b border-line">
               <h2 className="font-semibold text-ink-900">Generate Jadwal Otomatis</h2>
-              <p className="text-xs text-ink-400 mt-0.5">Buat slot otomatis 4 sesi/hari, masing-masing 1,5 jam</p>
+              <p className="text-xs text-ink-400 mt-0.5">Buat slot otomatis 4 sesi/hari (09–11, 12–15, 15–18, 18–21)</p>
             </div>
             <div className="px-6 py-5 space-y-4">
               <div className="bg-pine-50 border border-pine-100 rounded-xl p-3 space-y-1">
