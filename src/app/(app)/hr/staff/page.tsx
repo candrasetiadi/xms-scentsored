@@ -13,9 +13,11 @@ export default async function StaffPage() {
     .from('staff').select('role').eq('auth_user_id', user.id).eq('active', true).single()
   if (!me || !['owner', 'admin'].includes(me.role)) redirect('/hr')
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = supabase as any
   const [{ data: staffList }, { data: branches }] = await Promise.all([
-    supabase.from('staff').select('id, name, nickname, team, job_title, role, active, branch_id').order('name'),
-    supabase.from('branches').select('id, name').eq('active', true).order('name'),
+    db.from('staff').select('id, name, nickname, team, job_title, role, active, branch_id').order('name'),
+    db.from('branches').select('id, name').eq('active', true).order('name'),
   ])
 
   return <StaffClient initialStaff={staffList ?? []} branches={branches ?? []} />

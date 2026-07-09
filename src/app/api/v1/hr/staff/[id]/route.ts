@@ -63,11 +63,11 @@ export async function PATCH(
   if (Object.keys(updates).length === 0)
     return NextResponse.json({ error: 'Tidak ada field yang diupdate.' }, { status: 400 })
 
-  const admin = createAdminClient()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const admin = createAdminClient() as any
   const { data, error } = await admin
     .from('staff')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .update(updates as any)
+    .update(updates)
     .eq('id', id)
     .select('id, name, nickname, team, job_title, role, active, branch_id, branches(id, name)')
     .single()

@@ -20,7 +20,8 @@ export async function GET() {
   const ctx = await requireManager()
   if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { data, error } = await ctx.supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (ctx.supabase as any)
     .from('staff')
     .select('id, name, nickname, team, job_title, role, active, branch_id, branches(id, name)')
     .order('name')
@@ -65,7 +66,8 @@ export async function POST(request: Request) {
   if (authErr) return NextResponse.json({ error: authErr.message }, { status: 400 })
 
   // 2. Create staff record
-  const { data: staff, error: staffErr } = await admin
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: staff, error: staffErr } = await (admin as any)
     .from('staff')
     .insert({
       auth_user_id: authData.user.id,
