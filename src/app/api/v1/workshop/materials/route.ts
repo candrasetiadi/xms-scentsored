@@ -22,7 +22,7 @@ export async function GET() {
     .eq('active', true)
     .single()
   if (!staff) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!['owner', 'admin'].includes(staff.role))
+  if (!['owner', 'admin', 'stock_keeper'].includes(staff.role))
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -65,7 +65,7 @@ export async function POST(request: Request) {
     .eq('active', true)
     .single()
   if (!staff) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!['owner', 'admin'].includes(staff.role))
+  if (!['owner', 'admin', 'stock_keeper'].includes(staff.role))
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   let body: { name?: string; dilution_percentage?: number | null; category_id?: string | null }

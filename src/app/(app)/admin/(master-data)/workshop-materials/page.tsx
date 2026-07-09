@@ -11,7 +11,7 @@ export default async function WorkshopMaterialsPage() {
 
   const { data: staff } = await supabase
     .from('staff').select('role').eq('auth_user_id', user.id).eq('active', true).single()
-  if (!staff || !['owner', 'admin'].includes(staff.role)) redirect('/dashboard')
+  if (!staff || !['owner', 'admin', 'stock_keeper'].includes(staff.role)) redirect('/dashboard')
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db = supabase as any

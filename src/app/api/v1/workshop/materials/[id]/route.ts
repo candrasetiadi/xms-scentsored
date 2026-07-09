@@ -21,7 +21,7 @@ export async function PATCH(
     .eq('active', true)
     .single()
   if (!staff) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!['owner', 'admin'].includes(staff.role))
+  if (!['owner', 'admin', 'stock_keeper'].includes(staff.role))
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { id } = await params
@@ -106,7 +106,7 @@ export async function DELETE(
     .eq('active', true)
     .single()
   if (!staff) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!['owner', 'admin'].includes(staff.role))
+  if (!['owner', 'admin', 'stock_keeper'].includes(staff.role))
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { id } = await params

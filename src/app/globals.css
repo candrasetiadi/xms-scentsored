@@ -87,6 +87,7 @@ html {
 /* Chatime only for display — enforced here, not in @theme utility */
 .font-display {
   font-family: var(--font-display);
+  text-transform: uppercase;
 }
 
 /* Numeric tables */

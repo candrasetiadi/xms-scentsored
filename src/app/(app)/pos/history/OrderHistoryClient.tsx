@@ -85,11 +85,12 @@ function ChevronIcon({ open }: { open: boolean }) {
 
 // ── Item detail panel (shared between mobile + desktop) ───────────────────────
 
-function ItemDetail({ items, discount, total, loading }: {
-  items:    OrderItem[] | null
-  discount: number
-  total:    number
-  loading:  boolean
+function ItemDetail({ items, discount, total, loading, showLabels }: {
+  items:      OrderItem[] | null
+  discount:   number
+  total:      number
+  loading:    boolean
+  showLabels: boolean
 }) {
   if (loading) return (
     <div className="py-5 text-center text-xs text-ink-400 animate-pulse">Memuat detail…</div>
@@ -115,11 +116,25 @@ function ItemDetail({ items, discount, total, loading }: {
             )}
             <p className="text-[10px] text-ink-400 mt-0.5 font-mono">{item.product?.sku ?? ''}</p>
           </div>
-          <div className="text-right shrink-0">
-            <p className="text-xs tabular-nums text-ink-900 font-semibold">{formatRp(item.line_total)}</p>
-            <p className="text-[10px] tabular-nums text-ink-400 mt-0.5">
-              {item.qty} × {formatRp(item.unit_price)}
-            </p>
+          <div className="flex items-start gap-2 shrink-0">
+            {showLabels && item.product?.type === 'custom_racik' && (
+              <button
+                onClick={e => {
+                  e.stopPropagation()
+                  e.preventDefault()
+                  window.open(`/print/label/${item.id}?qty=${item.qty}`, '_blank', 'noopener,noreferrer')
+                }}
+                className="text-[10px] font-medium text-ink-400 hover:text-pine transition-colors px-2 py-1 rounded border border-line hover:border-pine-200 hover:bg-pine-50 leading-none shrink-0"
+              >
+                🏷 Label
+              </button>
+            )}
+            <div className="text-right">
+              <p className="text-xs tabular-nums text-ink-900 font-semibold">{formatRp(item.line_total)}</p>
+              <p className="text-[10px] tabular-nums text-ink-400 mt-0.5">
+                {item.qty} × {formatRp(item.unit_price)}
+              </p>
+            </div>
           </div>
         </div>
       ))}
@@ -270,7 +285,10 @@ function MobileOrderCard({ order, staffRole, cancelling, resending, msg, onCance
       {/* Expanded: items + actions */}
       {open && (
         <div className="border-t border-line bg-sand-50/50">
-          <ItemDetail items={items} discount={order.discount} total={order.total} loading={loading} />
+          <ItemDetail
+            items={items} discount={order.discount} total={order.total} loading={loading}
+            showLabels={['paid', 'completed'].includes(order.status)}
+          />
           <div className="px-4 py-3 border-t border-line" onClick={e => e.stopPropagation()}>
             <OrderActions
               order={order} staffRole={staffRole}
@@ -373,7 +391,10 @@ function DesktopOrderRow({ order, staffRole, cancelling, resending, msg, onCance
         <tr className="bg-sand-50/60">
           <td colSpan={7} className="px-4 pb-4 pt-0">
             <div className="border border-line rounded-xl overflow-hidden mt-2 bg-white">
-              <ItemDetail items={items} discount={order.discount} total={order.total} loading={loading} />
+              <ItemDetail
+                items={items} discount={order.discount} total={order.total} loading={loading}
+                showLabels={['paid', 'completed'].includes(order.status)}
+              />
             </div>
             <div className="mt-3 flex items-center gap-2" onClick={e => e.stopPropagation()}>
               <OrderActions

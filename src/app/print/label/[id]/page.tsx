@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { LabelPrintClient } from './LabelPrintClient'
 
 // Cetak label parfum per order_item_id
-// URL: /print/label/:order_item_id
+// URL: /print/label/:order_item_id?qty=1
 export default async function LabelPrintPage({
   params,
   searchParams,
@@ -18,48 +18,35 @@ export default async function LabelPrintPage({
   const { id: orderItemId } = await params
   const { qty: qtyParam }   = await searchParams
 
-  // Ambil order item
-  const { data: item, error } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: item, error } = await (supabase as any)
     .from('order_items')
-    .select('id, order_id, product_id, qty, unit_price, is_custom, customization_notes')
+    .select('id, product_id, qty, size_ml, customization_notes')
     .eq('id', orderItemId)
     .single()
 
   if (error || !item) redirect('/pos/history')
 
-  // Ambil order + product secara paralel
-  const [orderRes, productRes] = await Promise.all([
-    supabase.from('orders').select('order_number, queue_number, created_at, branch_id').eq('id', item.order_id).single(),
-    supabase.from('products').select('name, sku, category').eq('id', item.product_id).single(),
-  ])
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: product } = await (supabase as any)
+    .from('products')
+    .select('name, concentration')
+    .eq('id', item.product_id)
+    .single()
 
-  const order   = orderRes.data
-  const product = productRes.data
-  if (!order || !product) redirect('/pos/history')
+  if (!product) redirect('/pos/history')
 
-  // Ambil nama branch
-  const { data: branch } = await supabase
-    .from('branches').select('name').eq('id', order.branch_id).single()
-
-  const printQty = parseInt(qtyParam ?? '1')
+  // perfume_size: dari size_ml variant, fallback ke customization_notes
+  const perfumeSize: string = item.size_ml
+    ? `${item.size_ml} mL`
+    : (item.customization_notes ?? '')
 
   return (
     <LabelPrintClient
-      item={{
-        id:                  item.id,
-        qty:                 item.qty,
-        unit_price:          item.unit_price,
-        is_custom:           item.is_custom,
-        customization_notes: item.customization_notes ?? null,
-      }}
-      product={{ name: product.name, sku: product.sku, category: product.category ?? null }}
-      order={{
-        order_number: order.order_number,
-        queue_number: order.queue_number,
-        created_at:   order.created_at,
-      }}
-      branchName={branch?.name ?? 'Scentsored'}
-      printQty={Math.min(Math.max(1, printQty), 20)}
+      perfumeName={product.name}
+      perfumeSize={perfumeSize}
+      perfumeType={product.concentration ?? 'EXTRAIT DE PARFUM'}
+      printQty={Math.min(Math.max(1, parseInt(qtyParam ?? '1')), 20)}
     />
   )
 }
