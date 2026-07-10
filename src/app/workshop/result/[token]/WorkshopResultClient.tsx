@@ -5,7 +5,7 @@ import { useState, useCallback } from 'react'
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface ScentCategory { id: string; name: string; color_hex: string }
-interface Material { id: string; name: string; dilution_percentage: number | null; scent_categories: ScentCategory | null }
+interface Material { id: string; name: string; display_name: string | null; dilution_percentage: number | null; scent_categories: ScentCategory | null }
 interface Item { id: string; line_no: number; drops: number | null; grams: number; workshop_materials: Material | null }
 interface Slot { date: string; start_time: string; end_time: string }
 interface Customer { name: string }
@@ -182,7 +182,7 @@ export function WorkshopResultClient({ formulation: f }: Props) {
                 <div key={item.id} className="grid grid-cols-[2rem_1fr_auto_auto] gap-x-3 px-4 py-3 border-b border-line last:border-0 items-start">
                   <span className="text-xs text-ink-400 tabular-nums pt-0.5">{item.line_no}</span>
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-ink-900 leading-tight">{mat?.name ?? '—'}</p>
+                    <p className="text-sm font-medium text-ink-900 leading-tight">{mat?.display_name ?? mat?.name ?? '—'}</p>
                     <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                       <CategoryPill cat={cat} />
                       {mat?.dilution_percentage != null && (

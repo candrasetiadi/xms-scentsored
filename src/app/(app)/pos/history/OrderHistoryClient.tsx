@@ -118,16 +118,15 @@ function ItemDetail({ items, discount, total, loading, showLabels }: {
           </div>
           <div className="flex items-start gap-2 shrink-0">
             {showLabels && item.product?.type === 'custom_racik' && (
-              <button
-                onClick={e => {
-                  e.stopPropagation()
-                  e.preventDefault()
-                  window.open(`/print/label/${item.id}?qty=${item.qty}`, '_blank', 'noopener,noreferrer')
-                }}
+              <a
+                href={`/print/label/${item.id}?qty=${item.qty}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={e => e.stopPropagation()}
                 className="text-[10px] font-medium text-ink-400 hover:text-pine transition-colors px-2 py-1 rounded border border-line hover:border-pine-200 hover:bg-pine-50 leading-none shrink-0"
               >
                 🏷 Label
-              </button>
+              </a>
             )}
             <div className="text-right">
               <p className="text-xs tabular-nums text-ink-900 font-semibold">{formatRp(item.line_total)}</p>

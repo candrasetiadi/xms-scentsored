@@ -5,7 +5,7 @@
 // TODO(production): jalur via P-touch Template + print agent lokal (TCP ke
 //   Brother PT-P900W di LAN toko via Wi-Fi) — belum dikerjakan di MVP.
 
-import { useEffect } from 'react'
+// no react imports needed
 
 interface Props {
   perfumeName: string
@@ -38,11 +38,6 @@ function WaxSeal({ size }: { size: number }) {
 }
 
 export function LabelPrintClient({ perfumeName, perfumeSize, perfumeType, printQty }: Props) {
-  useEffect(() => {
-    const t = setTimeout(() => window.print(), 400)
-    return () => clearTimeout(t)
-  }, [])
-
   const labels = Array.from({ length: printQty })
 
   return (
@@ -71,7 +66,7 @@ export function LabelPrintClient({ perfumeName, perfumeSize, perfumeType, printQ
         </div>
 
         {/* ── Preview layar: 3× scale ── */}
-        <div style={{ paddingTop:56, background:'#f0ece8', minHeight:'100vh', display:'flex', flexWrap:'wrap', gap:24, padding:'72px 24px 32px', alignItems:'flex-start' }}>
+        <div style={{ background:'#f0ece8', minHeight:'100vh', display:'flex', flexWrap:'wrap', gap:24, padding:'72px 24px 32px', alignItems:'flex-start', justifyContent:'center' }}>
           {labels.map((_, i) => (
             <div key={i} className="label-preview">
               {/* Wax seal — 30mm rendered at ~113px (3× of 10mm) */}
@@ -111,8 +106,8 @@ export function LabelPrintClient({ perfumeName, perfumeSize, perfumeType, printQ
         #print-labels { display: none; }
 
         .label-preview {
-          width: 108mm;          /* 36mm × 3 */
-          height: 120mm;         /* 40mm × 3 */
+          width: min(108mm, 90vw);
+          height: min(120mm, calc(90vw * 40 / 36));
           background: #fff;
           box-sizing: border-box;
           display: flex;

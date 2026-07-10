@@ -13,7 +13,7 @@ export async function GET() {
 
   const { data, error } = await db
     .from('workshop_materials')
-    .select('id, name, dilution_percentage, scent_categories(id, name, color_hex, sort_order)')
+    .select('id, name, display_name, dilution_percentage, segment, scent_categories(id, name, color_hex, sort_order)')
     .eq('active', true)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -33,7 +33,9 @@ export async function GET() {
       return {
         id: m.id,
         name: m.name,
+        display_name: m.display_name ?? null,
         dilution_percentage: m.dilution_percentage,
+        segment: (m.segment as string) ?? 'regular',
         category: cat ? { id: cat.id, name: cat.name, color_hex: cat.color_hex } : null,
       }
     })

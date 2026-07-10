@@ -6,6 +6,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 type RawCategory = { name: string; color_hex: string } | null
 type RawMaterial = {
   name: string
+  display_name: string | null
   dilution_percentage: number
   scent_categories: RawCategory
 } | null
@@ -46,7 +47,7 @@ export async function GET(
       workshop_formulation_items(
         id, line_no, drops, grams, material_id,
         workshop_materials(
-          name, dilution_percentage,
+          name, display_name, dilution_percentage,
           scent_categories(name, color_hex)
         )
       )
@@ -91,6 +92,7 @@ export async function GET(
             material: mat
               ? {
                   name:                mat.name,
+                  display_name:        mat.display_name ?? null,
                   dilution_percentage: mat.dilution_percentage,
                   category:            cat ? { name: cat.name, color_hex: cat.color_hex } : null,
                 }

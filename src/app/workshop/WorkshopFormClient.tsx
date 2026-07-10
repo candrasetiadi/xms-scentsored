@@ -16,7 +16,9 @@ interface ScentCategory { id: string; name: string; color_hex: string }
 interface WorkshopMaterial {
   id: string
   name: string
+  display_name: string | null
   dilution_percentage: number | null
+  segment: 'regular' | 'kids'
   category: ScentCategory | null
 }
 
@@ -40,6 +42,8 @@ const SIZE_OPTIONS = [
   { ml: 50,  grams: 30 },
   { ml: 100, grams: 60 },
 ] as const
+
+type Segment = 'adult' | 'kids'
 
 interface CountryCode { dial: string; flag: string; name: string }
 const COUNTRY_CODES: CountryCode[] = [
@@ -80,6 +84,7 @@ function fmtSlotLabel(slot: SlotOption) {
   return `${fmtDate(slot.date)}  ·  ${fmtTime(slot.start_time)} – ${fmtTime(slot.end_time)}`
 }
 const fmtGram = (n: number) => n % 1 === 0 ? `${n}g` : `${n.toFixed(2)}g`
+
 
 // Rumus normalisasi: gram_per_drop = targetGrams / total_drops (guard /0)
 function computeGrams(drops: number | '', totalDrops: number, targetGrams: number): number {
@@ -143,7 +148,7 @@ function MaterialPicker({ materials, selectedIds, onSelect, onClose }: MaterialP
   const filtered = useMemo(() => {
     const q = debouncedSearch.toLowerCase().trim()
     return materials.filter(m => {
-      const matchName   = !q || m.name.toLowerCase().includes(q)
+      const matchName   = !q || (m.display_name ?? m.name).toLowerCase().includes(q)
       const matchCat    = !q || (m.category?.name.toLowerCase().includes(q) ?? false)
       const matchFilter = !categoryFilter || m.category?.id === categoryFilter
       return (matchName || matchCat) && matchFilter
@@ -228,7 +233,7 @@ function MaterialPicker({ materials, selectedIds, onSelect, onClose }: MaterialP
                   )}
                 </span>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-ink-900 truncate">{m.name}</p>
+                  <p className="text-sm font-medium text-ink-900 truncate">{m.display_name ?? m.name}</p>
                   <div className="flex items-center gap-2 mt-0.5">
                     <CategoryPill category={m.category} />
                     {m.dilution_percentage !== null && (
@@ -337,6 +342,7 @@ interface DraftData {
   notes:          string
   selectedSlotId: string
   selectedMl:     number
+  segment:        Segment
   items:          FormulationItem[]
 }
 
@@ -407,7 +413,8 @@ export function WorkshopFormClient({ initialSlotId, editToken }: Props) {
   const [items,      setItems]      = useState<FormulationItem[]>([])
   const [showPicker, setShowPicker] = useState(false)
 
-  const [selectedMl, setSelectedMl] = useState<number>(50)
+  const [selectedMl,  setSelectedMl]  = useState<number>(50)
+  const [segment,     setSegment]     = useState<Segment>('adult')
 
   const [submitting,    setSubmitting]    = useState(false)
   const [submitError,   setSubmitError]   = useState('')
@@ -484,6 +491,7 @@ export function WorkshopFormClient({ initialSlotId, editToken }: Props) {
     setNotes(draft.notes)
     setSelectedSlotId(draft.selectedSlotId || initialSlotId || '')
     if (draft.selectedMl) setSelectedMl(draft.selectedMl)
+    if (draft.segment)    setSegment(draft.segment)
     setItems(draft.items)
     setHasDraft(false)
   }
@@ -501,11 +509,11 @@ export function WorkshopFormClient({ initialSlotId, editToken }: Props) {
       const isEmpty = !name && !phoneNumber && !social && !perfumeName && !theme && !notes && items.length === 0
       if (isEmpty) return
       const now = Date.now()
-      saveDraft({ savedAt: now, step, name, phoneDialCode, phoneNumber, social, perfumeName, theme, notes, selectedSlotId, selectedMl, items })
+      saveDraft({ savedAt: now, step, name, phoneDialCode, phoneNumber, social, perfumeName, theme, notes, selectedSlotId, selectedMl, segment, items })
       setDraftSavedAt(now)
     }, 800)
     return () => { if (draftTimerRef.current) clearTimeout(draftTimerRef.current) }
-  }, [step, name, phoneDialCode, phoneNumber, social, perfumeName, theme, notes, selectedSlotId, items, hasDraft, isEdit])
+  }, [step, name, phoneDialCode, phoneNumber, social, perfumeName, theme, notes, selectedSlotId, selectedMl, segment, items, hasDraft, isEdit])
 
   const fetchSlots = useCallback(async () => {
     setSlotsLoading(true)
@@ -545,6 +553,11 @@ export function WorkshopFormClient({ initialSlotId, editToken }: Props) {
   const selectedMaterialIds = useMemo(
     () => new Set(items.map(i => i.material_id)),
     [items],
+  )
+
+  const filteredMaterials = useMemo(
+    () => materials.filter(m => m.segment === (segment === 'kids' ? 'kids' : 'regular')),
+    [materials, segment],
   )
 
   // Computed grams (real-time, normalisasi proporsional)
@@ -823,11 +836,43 @@ export function WorkshopFormClient({ initialSlotId, editToken }: Props) {
       {/* Item list */}
       <div className="flex-1 px-4 pt-4 pb-36 space-y-3 max-w-md mx-auto w-full">
 
+        {/* Segment selector */}
+        <div className="bg-white border border-line rounded-2xl p-4">
+          <p className="text-[10px] font-semibold text-ink-400 uppercase tracking-widest mb-3">For</p>
+          <div className="flex gap-2">
+            {(['adult', 'kids'] as const).map(seg => (
+              <button
+                key={seg}
+                type="button"
+                onClick={() => {
+                  if (seg === segment) return
+                  setSegment(seg)
+                  setItems([])
+                  if (seg === 'kids') setSelectedMl(35)
+                }}
+                className={[
+                  'flex-1 rounded-xl py-3 text-center border-2 transition-all',
+                  segment === seg
+                    ? 'border-pine bg-pine-50'
+                    : 'border-line bg-sand-50 hover:border-pine-200',
+                ].join(' ')}
+              >
+                <p className={`text-sm font-bold ${segment === seg ? 'text-pine' : 'text-ink-700'}`}>
+                  {seg === 'adult' ? 'Adult' : 'Kids'}
+                </p>
+                <p className={`text-[10px] mt-0.5 ${segment === seg ? 'text-pine-600' : 'text-ink-400'}`}>
+                  {seg === 'adult' ? '35 / 50 / 100 ml' : '35 ml only'}
+                </p>
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Bottle size selector */}
         <div className="bg-white border border-line rounded-2xl p-4">
           <p className="text-[10px] font-semibold text-ink-400 uppercase tracking-widest mb-3">Bottle Size</p>
           <div className="flex gap-2">
-            {SIZE_OPTIONS.map(opt => (
+            {SIZE_OPTIONS.filter(opt => segment === 'kids' ? opt.ml === 35 : true).map(opt => (
               <button
                 key={opt.ml}
                 type="button"
@@ -867,7 +912,7 @@ export function WorkshopFormClient({ initialSlotId, editToken }: Props) {
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-ink-900 truncate">
-                    {material?.name ?? item.material_id}
+                    {material ? (material.display_name ?? material.name) : item.material_id}
                   </p>
                   <div className="mt-1">
                     <CategoryPill category={material?.category ?? null} />
@@ -884,56 +929,51 @@ export function WorkshopFormClient({ initialSlotId, editToken }: Props) {
                 </button>
               </div>
 
-              {/* Drops stepper + Grams read-only */}
-              <div className="flex items-end gap-3">
-                <div className="flex-1">
-                  <label className="block text-[10px] font-semibold text-ink-400 mb-1 uppercase tracking-wide">
+              {/* Drops stepper */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[10px] font-semibold text-ink-400 uppercase tracking-wide">
                     Drops <span className="text-danger">*</span>
                   </label>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const cur = typeof item.drops === 'number' ? item.drops : 0
-                        handleDropsChange(item._key, Math.max(0, cur - 1))
-                      }}
-                      className="w-10 h-10 flex-shrink-0 rounded-xl border border-line bg-sand-50 text-ink-700 text-lg font-semibold flex items-center justify-center hover:bg-sand-100 active:scale-95 transition-all"
-                      aria-label="Decrease drops"
-                    >
-                      −
-                    </button>
-                    <input
-                      type="number" min={0} step={1}
-                      value={item.drops === '' ? '' : item.drops}
-                      onChange={e => {
-                        const v = e.target.value
-                        if (v === '') { handleDropsChange(item._key, ''); return }
-                        const n = parseInt(v, 10)
-                        if (!isNaN(n) && n >= 0) handleDropsChange(item._key, n)
-                      }}
-                      placeholder="0"
-                      className="flex-1 rounded-xl px-3 py-2.5 text-sm border border-line outline-none focus:ring-2 focus:ring-pine-200 focus:border-pine text-ink-900 tabular-nums text-center"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const cur = typeof item.drops === 'number' ? item.drops : 0
-                        handleDropsChange(item._key, cur + 1)
-                      }}
-                      className="w-10 h-10 flex-shrink-0 rounded-xl border border-line bg-sand-50 text-ink-700 text-lg font-semibold flex items-center justify-center hover:bg-sand-100 active:scale-95 transition-all"
-                      aria-label="Increase drops"
-                    >
-                      +
-                    </button>
-                  </div>
+                  <span className="text-[10px] font-semibold text-ink-400 uppercase tracking-wide">
+                    Grams: <span className="text-pine tabular-nums">{itemGrams > 0 ? fmtGram(itemGrams) : '—'}</span>
+                  </span>
                 </div>
-
-                {/* Grams — read-only computed */}
-                <div className="flex-shrink-0 text-right pb-0.5">
-                  <p className="text-[10px] font-semibold text-ink-400 uppercase tracking-wide mb-1">Grams</p>
-                  <p className="text-sm font-semibold tabular-nums text-pine">
-                    {itemGrams > 0 ? fmtGram(itemGrams) : '—'}
-                  </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const cur = typeof item.drops === 'number' ? item.drops : 0
+                      handleDropsChange(item._key, Math.max(0, cur - 1))
+                    }}
+                    className="w-10 h-10 flex-shrink-0 rounded-xl border border-line bg-sand-50 text-ink-700 text-lg font-semibold flex items-center justify-center hover:bg-sand-100 active:scale-95 transition-all"
+                    aria-label="Decrease drops"
+                  >
+                    −
+                  </button>
+                  <input
+                    type="number" min={0} step={1}
+                    value={item.drops === '' ? '' : item.drops}
+                    onChange={e => {
+                      const v = e.target.value
+                      if (v === '') { handleDropsChange(item._key, ''); return }
+                      const n = parseInt(v, 10)
+                      if (!isNaN(n) && n >= 0) handleDropsChange(item._key, n)
+                    }}
+                    placeholder="0"
+                    className="flex-1 rounded-xl px-3 py-2.5 text-sm border border-line outline-none focus:ring-2 focus:ring-pine-200 focus:border-pine text-ink-900 tabular-nums text-center"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const cur = typeof item.drops === 'number' ? item.drops : 0
+                      handleDropsChange(item._key, cur + 1)
+                    }}
+                    className="w-10 h-10 flex-shrink-0 rounded-xl border border-line bg-sand-50 text-ink-700 text-lg font-semibold flex items-center justify-center hover:bg-sand-100 active:scale-95 transition-all"
+                    aria-label="Increase drops"
+                  >
+                    +
+                  </button>
                 </div>
               </div>
             </div>
@@ -981,7 +1021,7 @@ export function WorkshopFormClient({ initialSlotId, editToken }: Props) {
 
       {showPicker && (
         <MaterialPicker
-          materials={materials}
+          materials={filteredMaterials}
           selectedIds={selectedMaterialIds}
           onSelect={handleAddMaterial}
           onClose={() => setShowPicker(false)}

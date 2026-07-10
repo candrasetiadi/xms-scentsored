@@ -18,7 +18,7 @@ async function fetchFormulation(token: string) {
       workshop_formulation_items (
         id, line_no, drops, grams,
         workshop_materials (
-          id, name, dilution_percentage,
+          id, name, display_name, dilution_percentage,
           scent_categories ( id, name, color_hex )
         )
       )
