@@ -25,7 +25,10 @@ export default async function LabelPrintPage({
     .eq('id', orderItemId)
     .single()
 
-  if (error || !item) redirect('/pos/history')
+  if (error || !item) {
+    console.error('[label] order_items fetch error:', error?.message, 'item_id:', orderItemId)
+    redirect('/pos/history')
+  }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: product } = await (supabase as any)
@@ -38,7 +41,7 @@ export default async function LabelPrintPage({
 
   // perfume_size: dari size_ml variant, fallback ke customization_notes
   const perfumeSize: string = item.size_ml
-    ? `${item.size_ml} mL`
+    ? `${item.size_ml} ml`
     : (item.customization_notes ?? '')
 
   return (

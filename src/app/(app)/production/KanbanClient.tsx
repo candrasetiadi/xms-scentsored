@@ -10,6 +10,7 @@ export type ProductionStatus = 'antri' | 'diracik' | 'packing' | 'selesai' | 'di
 export interface ProductionOrder {
   id: string
   order_id: string
+  order_item_id: string
   order_number: string
   queue_number: number
   product_name: string
@@ -155,6 +156,20 @@ function ProductionCard({ order, column, onAdvance, advancing, error, warning }:
           </p>
         )}
       </div>
+
+      {/* Label button — hanya di kolom antri (sebelum diproses) */}
+      {column.status === 'antri' && (
+        <div className="px-3 py-2 border-t border-line">
+          <a
+            href={`/print/label/${order.order_item_id}?qty=1`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-1.5 w-full py-1.5 rounded border border-line text-[11px] font-medium text-ink-500 hover:text-pine hover:border-pine-200 hover:bg-pine-50 transition-colors"
+          >
+            🏷 Cetak Label
+          </a>
+        </div>
+      )}
 
       {/* Advance button */}
       {column.nextStatus && column.advanceLabel && column.advanceCls ? (
