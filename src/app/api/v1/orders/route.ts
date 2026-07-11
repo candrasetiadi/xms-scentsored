@@ -48,32 +48,19 @@ export async function POST(request: Request) {
   if (!canAccess) return NextResponse.json({ error: { code: 'FORBIDDEN_BRANCH' } }, { status: 403 })
 
   const { data, error } = await supabase.rpc('create_order_tx', {
-    p_branch_id:      branchId,
-    p_staff_id:       staff.id,
-    p_driver_id:      body.driver_id ?? null,
-    p_customer_name:  body.customer_name ?? null,
-    p_customer_phone: body.customer_phone ?? null,
-    p_discount:       body.discount ?? 0,
-    p_items:          body.items,
+    p_branch_id:       branchId,
+    p_staff_id:        staff.id,
+    p_driver_id:       body.driver_id      ?? null,
+    p_customer_name:   body.customer_name  ?? null,
+    p_customer_phone:  body.customer_phone ?? null,
+    p_discount:        body.discount       ?? 0,
+    p_items:           body.items,
+    p_sales_staff_id:  body.sales_staff_id ?? null,
   })
 
   if (error) return NextResponse.json({ error: { code: 'DB_ERROR', message: error.message } }, { status: 500 })
 
-  const result = data as CreateOrderResult
-
-  // Sisipkan sales_staff_id setelah order dibuat — kolom ini opsional
-  // dan tidak perlu atomik dengan create_order_tx.
-  if (body.sales_staff_id) {
-    const { error: updateErr } = await supabase
-      .from('orders')
-      .update({ sales_staff_id: body.sales_staff_id })
-      .eq('id', result.id)
-    if (updateErr) {
-      return NextResponse.json({ error: { code: 'DB_ERROR', message: updateErr.message } }, { status: 500 })
-    }
-  }
-
-  return NextResponse.json({ data: result }, { status: 201 })
+  return NextResponse.json({ data: data as CreateOrderResult }, { status: 201 })
 }
 
 // GET /api/v1/orders?branch_id=&status=&date=&limit=&offset=

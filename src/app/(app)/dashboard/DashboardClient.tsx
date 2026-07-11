@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import type { DashboardStats } from '@/types/database'
+import { AttendanceWidget } from './AttendanceWidget'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -346,6 +347,8 @@ export function DashboardClient({ staffId, staffName, staffRole, branchId }: Pro
         <div className="max-w-screen-md mx-auto px-4 md:px-6 py-8 space-y-6">
           <RangeHeader {...rangeProps} />
 
+          <AttendanceWidget />
+
           {error && (
             <div className="bg-danger-bg border border-danger-bd text-danger text-sm rounded-lg px-4 py-3">{error}</div>
           )}
@@ -456,6 +459,10 @@ export function DashboardClient({ staffId, staffName, staffRole, branchId }: Pro
     <div className="bg-sand-50 min-h-screen">
       <div className="max-w-screen-xl mx-auto px-6 py-8 space-y-6">
         <RangeHeader {...rangeProps} />
+
+        <div className="max-w-sm">
+          <AttendanceWidget />
+        </div>
 
         {error && (
           <div className="bg-danger-bg border border-danger-bd text-danger text-sm rounded-lg px-4 py-3">{error}</div>
