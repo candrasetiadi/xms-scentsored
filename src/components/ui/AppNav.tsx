@@ -21,6 +21,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Custom Perfume Schedule', href: '/admin/slots', roles: ['owner', 'admin'] },
   { label: 'Master Data', href: '/admin/products',   roles: ['owner', 'admin', 'stock_keeper'] },
   { label: 'Workshop',    href: '/admin/workshop',   roles: ['owner', 'admin', 'cashier', 'perfumer', 'stock_keeper'] },
+  { label: 'Pengajuan',   href: '/expenditure-requests', roles: ['owner', 'admin', 'cashier', 'perfumer', 'stock_keeper'] },
   { label: 'SDM',         href: '/hr',               roles: ['owner', 'admin', 'cashier', 'perfumer', 'stock_keeper'] },
 ]
 
