@@ -7,6 +7,7 @@ import { StatusBadge }    from '@/components/hr/StatusBadge'
 import { EmptyState }     from '@/components/hr/EmptyState'
 import { BottomSheet }    from '@/components/hr/BottomSheet'
 import { useToast }       from '@/components/hr/Toast'
+import { SelfieCamera }   from '@/components/hr/SelfieCamera'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -116,6 +117,8 @@ export function AttendanceClient({ staffId }: Props) {
   const [geoLoading,  setGeoLoading]  = useState(false)
   const [showClockOutConfirm, setShowClockOutConfirm] = useState(false)
   const [isFullShiftDesignated, setIsFullShiftDesignated] = useState(false)
+  const [selfieAction, setSelfieAction] = useState<'in' | 'out' | null>(null)
+  const [pendingCoords, setPendingCoords] = useState<{ latitude: number; longitude: number } | null>(null)
 
   const fetchData = useCallback(async () => {
     setError(null)
@@ -178,22 +181,8 @@ export function AttendanceClient({ staffId }: Props) {
       return
     }
     setGeoLoading(false)
-    setSubmitting(true)
-    try {
-      const res  = await fetch('/api/v1/hr/attendance/clock-in', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(coords),
-      })
-      const json = await res.json()
-      if (!res.ok) { showToast(json.error ?? 'Gagal clock in.', 'error'); return }
-      showToast(`Clock in berhasil pukul ${formatTime(json.data?.clock_in_at)}`)
-      await fetchData()
-    } catch {
-      showToast('Koneksi gagal. Coba lagi.', 'error')
-    } finally {
-      setSubmitting(false)
-    }
+    setPendingCoords(coords)
+    setSelfieAction('in')
   }
 
   async function handleClockOut() {
@@ -208,22 +197,68 @@ export function AttendanceClient({ staffId }: Props) {
       return
     }
     setGeoLoading(false)
+    setPendingCoords(coords)
+    setSelfieAction('out')
+  }
+
+  async function submitAttendance(action: 'in' | 'out', coords: { latitude: number; longitude: number }, selfiePath?: string) {
     setSubmitting(true)
     try {
-      const res  = await fetch('/api/v1/hr/attendance/clock-out', {
+      const endpoint = action === 'in' ? '/api/v1/hr/attendance/clock-in' : '/api/v1/hr/attendance/clock-out'
+      const res  = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(coords),
+        body: JSON.stringify({ ...coords, ...(selfiePath ? { selfie_path: selfiePath } : {}) }),
       })
       const json = await res.json()
-      if (!res.ok) { showToast(json.error ?? 'Gagal clock out.', 'error'); return }
-      showToast(`Clock out berhasil pukul ${formatTime(json.data?.clock_out_at)}`)
+      if (!res.ok) { showToast(json.error ?? `Gagal clock ${action}.`, 'error'); return }
+      const timeKey = action === 'in' ? json.data?.clock_in_at : json.data?.clock_out_at
+      showToast(`Clock ${action === 'in' ? 'in' : 'out'} berhasil pukul ${formatTime(timeKey)}`)
       await fetchData()
     } catch {
       showToast('Koneksi gagal. Coba lagi.', 'error')
     } finally {
       setSubmitting(false)
     }
+  }
+
+  async function handleSelfieCapture(blob: Blob) {
+    if (!pendingCoords || !selfieAction) return
+    const action = selfieAction
+    const coords = pendingCoords
+    setSelfieAction(null)
+    setPendingCoords(null)
+
+    // Upload selfie
+    setSubmitting(true)
+    let selfiePath: string | undefined
+    try {
+      const fd = new FormData()
+      fd.append('file', blob, 'selfie.jpg')
+      const upRes  = await fetch('/api/v1/hr/attendance/upload-selfie', { method: 'POST', body: fd })
+      const upJson = await upRes.json()
+      if (upRes.ok) selfiePath = upJson.data?.path
+    } catch {
+      // selfie upload failed — still proceed without it
+    } finally {
+      setSubmitting(false)
+    }
+
+    await submitAttendance(action, coords, selfiePath)
+  }
+
+  function handleSelfieSkip() {
+    if (!pendingCoords || !selfieAction) return
+    const action = selfieAction
+    const coords = pendingCoords
+    setSelfieAction(null)
+    setPendingCoords(null)
+    submitAttendance(action, coords)
+  }
+
+  function handleSelfieCancel() {
+    setSelfieAction(null)
+    setPendingCoords(null)
   }
 
   const clockedIn  = Boolean(today?.clock_in_at)
@@ -415,7 +450,13 @@ export function AttendanceClient({ staffId }: Props) {
         </div>
       </BottomSheet>
 
-      {staffId && null /* staffId used for future features */}
+      {selfieAction && (
+        <SelfieCamera
+          onCapture={handleSelfieCapture}
+          onSkip={handleSelfieSkip}
+          onCancel={handleSelfieCancel}
+        />
+      )}
     </div>
   )
 }

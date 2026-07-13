@@ -28,7 +28,7 @@ export async function POST(request: Request) {
     .single()
   if (!staff) return NextResponse.json({ error: 'Staff tidak ditemukan.' }, { status: 401 })
 
-  const body = await request.json().catch(() => ({})) as { work_date?: string; latitude?: number; longitude?: number }
+  const body = await request.json().catch(() => ({})) as { work_date?: string; latitude?: number; longitude?: number; selfie_path?: string }
 
   // Validasi radius lokasi
   if (ATTENDANCE_CONFIG.GEO_VALIDATION_ENABLED) {
@@ -49,6 +49,14 @@ export async function POST(request: Request) {
     p_work_date: workDate,
   })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Simpan selfie path jika ada
+  if (body.selfie_path) {
+    await (supabase as any).from('attendances')
+      .update({ selfie_out_url: body.selfie_path })
+      .eq('staff_id', staff.id)
+      .eq('work_date', workDate)
+  }
 
   // Fetch the updated record so client gets the actual clock_out_at + worked_minutes
   const { data: att } = await supabase

@@ -59,7 +59,7 @@ export async function POST(request: Request) {
     // Owner/admin lintas cabang → branch_id null, fallback ke branch utama (is_primary)
     let branchId = staff.branch_id
     if (!branchId) {
-      const { data: primaryBranch } = await supabase
+      const { data: primaryBranch } = await (supabase as any)
         .from('branches').select('id').eq('is_primary', true).single()
       branchId = primaryBranch?.id ?? null
     }
