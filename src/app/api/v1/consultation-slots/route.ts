@@ -1,7 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
-import { isGoogleCalendarConfigured, createSlotEvent } from '@/lib/google-calendar'
 
 // GET /api/v1/consultation-slots?branch_id=&from=&to=
 // Publik (anon) — ambil slot aktif untuk halaman booking
@@ -15,7 +14,7 @@ export async function GET(request: Request) {
   let query = (supabase as any)
     .from('consultation_slots')
     .select(`
-      id, branch_id, date, start_time, end_time, max_bookings, price, price_100ml, notes, is_active,
+      id, branch_id, date, start_time, end_time, max_bookings, price, price_100ml, price_kids, notes, is_active,
       branches!inner(id, name),
       consultation_bookings(id, status, qty)
     `)
@@ -46,6 +45,7 @@ export async function GET(request: Request) {
       max_bookings:  slot.max_bookings,
       price:         slot.price,
       price_100ml:   slot.price_100ml ?? 0,
+      price_kids:    slot.price_kids   ?? 0,
       filled,
       available:    Math.max(0, slot.max_bookings - filled),
       notes:        slot.notes,
@@ -68,7 +68,7 @@ export async function POST(request: Request) {
 
   let body: {
     branch_id?: string; date: string; start_time: string; end_time: string
-    max_bookings?: number; price?: number; price_100ml?: number; notes?: string
+    max_bookings?: number; price?: number; price_100ml?: number; price_kids?: number; notes?: string
   }
   try { body = await request.json() } catch {
     return NextResponse.json({ error: { code: 'VALIDATION', message: 'Body tidak valid.' } }, { status: 400 })
@@ -91,8 +91,9 @@ export async function POST(request: Request) {
       start_time:   body.start_time,
       end_time:     body.end_time,
       max_bookings:  body.max_bookings ?? 16,
-      price:         body.price ?? 0,
+      price:         body.price       ?? 0,
       price_100ml:   body.price_100ml ?? 0,
+      price_kids:    body.price_kids  ?? 0,
       notes:         body.notes ?? null,
     })
     .select('id, date, start_time, end_time, max_bookings, price')
@@ -100,36 +101,5 @@ export async function POST(request: Request) {
 
   if (error) return NextResponse.json({ error: { code: 'DB_ERROR', message: error.message } }, { status: 500 })
 
-  // Buat Google Calendar event langsung
-  if (isGoogleCalendarConfigured()) {
-    createCalendarEventForSlot(admin, slot, branchId)
-      .catch(err => console.error('[Calendar] gagal buat event untuk slot manual:', err))
-  }
-
   return NextResponse.json({ data: slot }, { status: 201 })
-}
-
-async function createCalendarEventForSlot(
-  admin: ReturnType<typeof createAdminClient>,
-  slot: { id: string; date: string; start_time: string; end_time: string; max_bookings: number },
-  branchId: string,
-) {
-  const { data: branch } = await admin
-    .from('branches').select('name').eq('id', branchId).single()
-  if (!branch) return
-
-  const eventId = await createSlotEvent({
-    slotDate:    slot.date,
-    startTime:   slot.start_time.slice(0, 5),
-    endTime:     slot.end_time.slice(0, 5),
-    branchName:  branch.name,
-    maxBookings: slot.max_bookings,
-  })
-
-  await admin
-    .from('consultation_slots')
-    .update({ calendar_event_id: eventId })
-    .eq('id', slot.id)
-
-  console.log(`[Calendar] Event dibuat untuk slot ${slot.id}: ${eventId}`)
 }

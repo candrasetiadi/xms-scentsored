@@ -18,9 +18,9 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Procurement', href: '/procurement',      roles: ['owner', 'admin', 'stock_keeper'] },
   { label: 'Komisi',      href: '/admin/commissions',   roles: ['owner', 'admin'] },
   { label: 'Laporan',     href: '/reporting',           roles: ['owner', 'admin'] },
-  { label: 'Custom Perfume Schedule', href: '/admin/slots', roles: ['owner', 'admin'] },
-  { label: 'Master Data', href: '/admin/products',   roles: ['owner', 'admin', 'stock_keeper'] },
-  { label: 'Workshop',    href: '/admin/workshop',   roles: ['owner', 'admin', 'cashier', 'perfumer', 'stock_keeper'] },
+  { label: 'Raw Mat Exp Schedule', href: '/admin/slots',    roles: ['owner', 'admin'] },
+  { label: 'Raw Mat Exp Result',   href: '/admin/workshop', roles: ['owner', 'admin', 'cashier', 'perfumer', 'stock_keeper'] },
+  { label: 'Master Data',          href: '/admin/products', roles: ['owner', 'admin', 'stock_keeper'] },
   { label: 'Pengajuan',   href: '/expenditure-requests', roles: ['owner', 'admin', 'cashier', 'perfumer', 'stock_keeper'] },
   { label: 'SDM',         href: '/hr',               roles: ['owner', 'admin', 'cashier', 'perfumer', 'stock_keeper'] },
 ]

@@ -1,8 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import { isMidtransConfigured, checkTransactionStatus } from '@/lib/midtrans'
-import { isGoogleCalendarConfigured } from '@/lib/google-calendar'
-import { syncCalendar } from '@/lib/calendar-sync'
 
 // GET /api/v1/bookings/:id/payment-status
 // Publik — dipakai polling countdown timer di halaman booking
@@ -41,16 +39,6 @@ export async function GET(
           .from('consultation_bookings')
           .update({ status: 'confirmed', paid_at: paidAt })
           .eq('id', id)
-
-        if (isGoogleCalendarConfigured()) {
-          const { data: slot } = await admin
-            .from('consultation_slots')
-            .select('max_bookings')
-            .eq('id', booking.slot_id)
-            .single()
-          syncCalendar({ slotId: booking.slot_id, maxBookings: slot?.max_bookings ?? 16 })
-            .catch(() => {})
-        }
 
         return NextResponse.json({ data: { status: 'confirmed', paid_at: paidAt } })
       }

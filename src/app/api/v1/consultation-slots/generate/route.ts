@@ -1,7 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
-import { isGoogleCalendarConfigured, createSlotEvent } from '@/lib/google-calendar'
 
 const DEFAULT_SESSIONS = [
   { start_time: '09:00', end_time: '10:30' },
@@ -29,6 +28,7 @@ export async function POST(request: Request) {
     max_bookings?: number
     price?: number
     price_100ml?: number
+    price_kids?: number
     sessions?: { start_time: string; end_time: string }[]
     skip_weekends?: boolean
   }
@@ -50,6 +50,7 @@ export async function POST(request: Request) {
   const maxBookings  = body.max_bookings ?? 16
   const price        = body.price       ?? 0
   const price_100ml  = body.price_100ml ?? 0
+  const price_kids   = body.price_kids  ?? 0
   const sessions     = body.sessions ?? DEFAULT_SESSIONS
   const skipWeekends = body.skip_weekends ?? false
 
@@ -78,7 +79,7 @@ export async function POST(request: Request) {
       const dateStr = cur.toISOString().slice(0, 10)
       for (const session of sessions) {
         if (!existingSet.has(`${dateStr}|${session.start_time}`)) {
-          toInsert.push({ branch_id: branchId, date: dateStr, start_time: session.start_time, end_time: session.end_time, max_bookings: maxBookings, price, price_100ml, is_active: true })
+          toInsert.push({ branch_id: branchId, date: dateStr, start_time: session.start_time, end_time: session.end_time, max_bookings: maxBookings, price, price_100ml, price_kids, is_active: true })
         }
       }
     }
@@ -100,50 +101,5 @@ export async function POST(request: Request) {
   const totalDays = Math.round((toDate.getTime() - fromDate.getTime()) / 86400_000) + 1
   const skipped   = totalDays * sessions.length - toInsert.length
 
-  // Buat Calendar events secara paralel (non-blocking — tidak tahan response)
-  if (isGoogleCalendarConfigured() && inserted && inserted.length > 0) {
-    createCalendarEventsInBatch(admin, inserted, branchId, maxBookings)
-      .catch(err => console.error('[Calendar] batch create error:', err))
-  }
-
   return NextResponse.json({ data: { created: toInsert.length, skipped } }, { status: 201 })
-}
-
-async function createCalendarEventsInBatch(
-  admin: ReturnType<typeof createAdminClient>,
-  slots: { id: string; date: string; start_time: string; end_time: string; max_bookings: number }[],
-  branchId: string,
-  maxBookings: number,
-) {
-  const { data: branch } = await admin
-    .from('branches').select('name').eq('id', branchId).single()
-  if (!branch) return
-
-  const branchName = branch.name
-  const BATCH = 10  // maksimal paralel per batch agar tidak rate-limit
-
-  for (let i = 0; i < slots.length; i += BATCH) {
-    const batch = slots.slice(i, i + BATCH)
-    await Promise.allSettled(
-      batch.map(async slot => {
-        try {
-          const eventId = await createSlotEvent({
-            slotDate:    slot.date,
-            startTime:   slot.start_time.slice(0, 5),
-            endTime:     slot.end_time.slice(0, 5),
-            branchName,
-            maxBookings,
-          })
-          await admin
-            .from('consultation_slots')
-            .update({ calendar_event_id: eventId })
-            .eq('id', slot.id)
-        } catch (err) {
-          console.error(`[Calendar] gagal buat event untuk slot ${slot.id}:`, err)
-        }
-      })
-    )
-  }
-
-  console.log(`[Calendar] ${slots.length} events dibuat untuk branch ${branchName}`)
 }

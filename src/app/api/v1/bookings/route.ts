@@ -1,19 +1,19 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { isGoogleCalendarConfigured } from '@/lib/google-calendar'
-import { syncCalendar } from '@/lib/calendar-sync'
 import { isMidtransConfigured, createQris } from '@/lib/midtrans'
 
 // POST /api/v1/bookings — publik (anon), buat booking + QRIS pembayaran
 export async function POST(request: Request) {
   let body: {
-    slot_id:        string
-    customer_name:  string
-    customer_phone: string
+    slot_id:         string
+    customer_name:   string
+    customer_phone:  string
     customer_email?: string
-    qty?:           number
-    notes?:         string
+    qty_50ml?:       number
+    qty_100ml?:      number
+    qty_kids?:       number
+    notes?:          string
   }
   try { body = await request.json() } catch {
     return NextResponse.json({ error: { code: 'VALIDATION', message: 'Body tidak valid.' } }, { status: 400 })
@@ -22,15 +22,22 @@ export async function POST(request: Request) {
   if (!body.slot_id || !body.customer_name || !body.customer_phone)
     return NextResponse.json({ error: { code: 'VALIDATION', message: 'slot_id, customer_name, customer_phone wajib.' } }, { status: 400 })
 
-  const qty = Math.max(1, Math.floor(body.qty ?? 1))
+  const qty50ml  = Math.max(0, Math.floor(body.qty_50ml  ?? 0))
+  const qty100ml = Math.max(0, Math.floor(body.qty_100ml ?? 0))
+  const qtyKids  = Math.max(0, Math.floor(body.qty_kids  ?? 0))
+
+  if (qty50ml + qty100ml + qtyKids < 1)
+    return NextResponse.json({ error: { code: 'VALIDATION', message: 'Pilih minimal 1 peserta.' } }, { status: 400 })
 
   const admin = createAdminClient()
-  const { data, error } = await admin.rpc('check_and_create_booking', {
+  const { data, error } = await (admin as any).rpc('check_and_create_booking', {
     p_slot_id:        body.slot_id,
     p_customer_name:  body.customer_name,
     p_customer_phone: body.customer_phone,
     p_customer_email: body.customer_email ?? null,
-    p_qty:            qty,
+    p_qty_50ml:       qty50ml,
+    p_qty_100ml:      qty100ml,
+    p_qty_kids:       qtyKids,
     p_notes:          body.notes ?? null,
   })
 
@@ -47,8 +54,13 @@ export async function POST(request: Request) {
     start_time:   string
     end_time:     string
     max_bookings: number
-    price:        number
     qty:          number
+    qty_50ml:     number
+    qty_100ml:    number
+    qty_kids:     number
+    price:        number
+    price_100ml:  number
+    price_kids:   number
     amount:       number
     expires_at:   string
     filled:       number
@@ -60,10 +72,6 @@ export async function POST(request: Request) {
       .from('consultation_bookings')
       .update({ status: 'confirmed', paid_at: new Date().toISOString() })
       .eq('id', result.booking_id)
-    if (isGoogleCalendarConfigured()) {
-      syncCalendar({ slotId: body.slot_id, maxBookings: result.max_bookings })
-        .catch(() => {})
-    }
     return NextResponse.json({
       data: {
         booking_id:   result.booking_id,
@@ -72,6 +80,9 @@ export async function POST(request: Request) {
         start_time:   result.start_time,
         end_time:     result.end_time,
         qty:          result.qty,
+        qty_50ml:     result.qty_50ml,
+        qty_100ml:    result.qty_100ml,
+        qty_kids:     result.qty_kids,
         price:        0,
         amount:       0,
         expires_at:   null,
@@ -110,6 +121,9 @@ export async function POST(request: Request) {
       start_time:   result.start_time,
       end_time:     result.end_time,
       qty:          result.qty,
+      qty_50ml:     result.qty_50ml,
+      qty_100ml:    result.qty_100ml,
+      qty_kids:     result.qty_kids,
       price:        result.price,
       amount:       result.amount,
       expires_at:   result.expires_at,
@@ -135,7 +149,7 @@ export async function GET(request: Request) {
 
   let query = (supabase as any)
     .from('consultation_bookings')
-    .select('id, slot_id, customer_name, customer_phone, customer_email, qty, size_ml, status, amount, expires_at, paid_at, notes, queue_number, created_at')
+    .select('id, slot_id, customer_name, customer_phone, customer_email, qty, qty_50ml, qty_100ml, qty_kids, status, amount, expires_at, paid_at, notes, queue_number, created_at')
     .order('queue_number')
 
   if (slotId) query = query.eq('slot_id', slotId)

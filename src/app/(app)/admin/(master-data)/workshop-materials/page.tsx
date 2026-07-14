@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { WorkshopMaterialsClient } from './WorkshopMaterialsClient'
 
-export const metadata = { title: 'Bahan Workshop — Scentsored' }
+export const metadata = { title: 'Bahan Raw Mat Experience — Scentsored' }
 
 export default async function WorkshopMaterialsPage() {
   const supabase = await createClient()

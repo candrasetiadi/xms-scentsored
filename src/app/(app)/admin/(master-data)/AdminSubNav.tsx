@@ -14,7 +14,7 @@ interface NavEntry {
 const ADMIN_NAV: NavEntry[] = [
   { label: 'Produk',                 href: '/admin/products',           roles: ['owner', 'admin'] },
   { label: 'Bahan Baku',             href: '/admin/raw-materials',      roles: ['owner', 'admin'] },
-  { label: 'Raw Materials Workshop', href: '/admin/workshop-materials', roles: ['owner', 'admin', 'stock_keeper'] },
+  { label: 'Raw Mat Experience',     href: '/admin/workshop-materials', roles: ['owner', 'admin', 'stock_keeper'] },
   { label: 'Resep / BOM',            href: '/admin/recipes',            roles: ['owner', 'admin'] },
   { label: 'Supplier',               href: '/admin/suppliers',          roles: ['owner', 'admin'] },
   { label: 'Driver',                 href: '/admin/drivers',            roles: ['owner', 'admin'] },

@@ -128,7 +128,7 @@ export function WorkshopResultClient({ formulation: f }: Props) {
           </div>
           {f.consultation_slots && (
             <div className="pt-2 border-t border-line">
-              <p className="text-xs text-ink-500 mb-0.5">Workshop Session</p>
+              <p className="text-xs text-ink-500 mb-0.5">Raw Mat Experience Session</p>
               <p className="text-sm font-medium text-ink-900">
                 {fmtDate(f.consultation_slots.date)} · {fmtTime(f.consultation_slots.start_time)} – {fmtTime(f.consultation_slots.end_time)}
               </p>

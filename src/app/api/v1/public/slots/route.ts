@@ -54,7 +54,7 @@ export async function GET(request: Request) {
   let query = (admin as any)
     .from('consultation_slots')
     .select(`
-      id, branch_id, date, start_time, end_time, max_bookings, price, price_100ml, notes,
+      id, branch_id, date, start_time, end_time, max_bookings, price, price_100ml, price_kids, notes,
       branches!inner(id, name),
       consultation_bookings(status, qty)
     `)
@@ -89,8 +89,9 @@ export async function GET(request: Request) {
       start_time:   slot.start_time.slice(0, 5),
       end_time:     slot.end_time.slice(0, 5),
       max_bookings: slot.max_bookings,
-      price:        slot.price        ?? 0,
-      price_100ml:  slot.price_100ml  ?? 0,
+      price:        slot.price       ?? 0,
+      price_100ml:  slot.price_100ml ?? 0,
+      price_kids:   slot.price_kids  ?? 0,
       filled,
       available:    slot.max_bookings - filled,
       is_full:      filled >= slot.max_bookings,

@@ -698,7 +698,7 @@ export function WorkshopFormClient({ initialSlotId, editToken }: Props) {
 
           <div>
             <label htmlFor={slotId_} className="block text-xs font-semibold text-ink-500 mb-1.5 uppercase tracking-wide">
-              Workshop Session
+              Raw Mat Experience Session
             </label>
             {slotsLoading ? (
               <div className="w-full rounded-xl border border-line bg-sand-100 py-3.5 px-4 text-sm text-ink-400 animate-pulse">

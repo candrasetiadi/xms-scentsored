@@ -1,7 +1,7 @@
 import { WorkshopFormClient } from './WorkshopFormClient'
 
 export const metadata = {
-  title: 'Formulasi Parfum — Workshop Scentsored',
+  title: 'Raw Mat Experience — Scentsored',
 }
 
 export default async function WorkshopPage({

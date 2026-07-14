@@ -2,8 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { BookingClient } from './BookingClient'
 
 export const metadata = {
-  title:       'Booking Konsultasi — Scentsored',
-  description: 'Booking sesi konsultasi racik parfum personal bersama Scentsored.',
+  title:       'Raw Mat Experience — Scentsored',
+  description: 'Booking sesi Raw Mat Experience bersama Scentsored.',
 }
 
 export default async function BookingPage() {

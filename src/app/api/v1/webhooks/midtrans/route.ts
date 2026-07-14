@@ -2,8 +2,6 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { sendInvoiceWa } from '@/lib/messaging'
-import { isGoogleCalendarConfigured } from '@/lib/google-calendar'
-import { syncCalendar } from '@/lib/calendar-sync'
 
 // POST /api/v1/webhooks/midtrans  — publik, dikecualikan dari middleware auth
 // Menangani settlement untuk POS order DAN booking konsultasi secara idempotent.
@@ -75,16 +73,6 @@ export async function POST(request: Request) {
         .update({ status: 'confirmed', paid_at: paidAt })
         .eq('id', booking.id)
 
-      if (isGoogleCalendarConfigured()) {
-        const { data: slot } = await admin
-          .from('consultation_slots')
-          .select('max_bookings')
-          .eq('id', booking.slot_id)
-          .single()
-        syncCalendar({ slotId: booking.slot_id, maxBookings: slot?.max_bookings ?? 16 })
-          .catch(err => console.error('[Calendar] webhook sync error:', err))
-      }
-
       console.log(`[Midtrans] Booking ${booking.id} confirmed via webhook`)
     }
 
@@ -93,16 +81,6 @@ export async function POST(request: Request) {
         .from('consultation_bookings')
         .update({ status: 'expired' })
         .eq('id', booking.id)
-
-      if (isGoogleCalendarConfigured()) {
-        const { data: slot } = await admin
-          .from('consultation_slots')
-          .select('max_bookings')
-          .eq('id', booking.slot_id)
-          .single()
-        syncCalendar({ slotId: booking.slot_id, maxBookings: slot?.max_bookings ?? 16 })
-          .catch(err => console.error('[Calendar] webhook sync error (expire):', err))
-      }
 
       console.log(`[Midtrans] Booking ${booking.id} expired via webhook`)
     }

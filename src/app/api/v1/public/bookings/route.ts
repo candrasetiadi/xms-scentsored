@@ -38,17 +38,18 @@ function validateApiKey(request: Request): boolean {
 // Endpoint untuk website eksternal. Memerlukan header: X-API-Key: <secret>
 //
 // Request body:
-//   slot_id        string     — wajib
-//   customer_name  string     — wajib
-//   customer_phone string     — wajib
-//   customer_email string     — opsional
-//   qty            number     — default 1
-//   size_ml        50 | 100  — default 50
-//   notes          string     — opsional
+//   slot_id        string  — wajib
+//   customer_name  string  — wajib
+//   customer_phone string  — wajib
+//   customer_email string  — opsional
+//   qty_50ml       number  — jumlah peserta 50ml, default 0
+//   qty_100ml      number  — jumlah peserta 100ml, default 0
+//   qty_kids       number  — jumlah peserta kids (35ml), default 0
+//   notes          string  — opsional
 //
 // Response 201:
 //   { data: { booking_id, queue_number, slot_date, start_time, end_time,
-//             qty, size_ml, price, amount, expires_at, snap_token, payment_url } }
+//             qty, qty_50ml, qty_100ml, qty_kids, amount, expires_at, snap_token, payment_url } }
 
 export async function POST(request: Request) {
   if (!validateApiKey(request)) {
@@ -63,8 +64,9 @@ export async function POST(request: Request) {
     customer_name:   string
     customer_phone:  string
     customer_email?: string
-    qty?:            number
-    size_ml?:        50 | 100
+    qty_50ml?:       number
+    qty_100ml?:      number
+    qty_kids?:       number
     notes?:          string
   }
   try { body = await request.json() } catch {
@@ -81,17 +83,27 @@ export async function POST(request: Request) {
     )
   }
 
-  const qty    = Math.max(1, Math.floor(body.qty ?? 1))
-  const sizeMl = body.size_ml === 100 ? 100 : 50
-  const admin  = createAdminClient()
+  const qty50ml  = Math.max(0, Math.floor(body.qty_50ml  ?? 0))
+  const qty100ml = Math.max(0, Math.floor(body.qty_100ml ?? 0))
+  const qtyKids  = Math.max(0, Math.floor(body.qty_kids  ?? 0))
+
+  if (qty50ml + qty100ml + qtyKids < 1) {
+    return NextResponse.json(
+      { error: { code: 'VALIDATION', message: 'Pilih minimal 1 peserta.' } },
+      { status: 400, headers: corsHeaders(request) },
+    )
+  }
+
+  const admin = createAdminClient()
 
   const { data, error } = await (admin as any).rpc('check_and_create_booking', {
     p_slot_id:        body.slot_id,
     p_customer_name:  body.customer_name,
     p_customer_phone: body.customer_phone,
     p_customer_email: body.customer_email ?? null,
-    p_qty:            qty,
-    p_size_ml:        sizeMl,
+    p_qty_50ml:       qty50ml,
+    p_qty_100ml:      qty100ml,
+    p_qty_kids:       qtyKids,
     p_notes:          body.notes ?? null,
   })
 
@@ -111,9 +123,13 @@ export async function POST(request: Request) {
     start_time:   string
     end_time:     string
     max_bookings: number
-    size_ml:      number
-    price:        number
     qty:          number
+    qty_50ml:     number
+    qty_100ml:    number
+    qty_kids:     number
+    price:        number
+    price_100ml:  number
+    price_kids:   number
     amount:       number
     expires_at:   string
   }
@@ -151,8 +167,9 @@ export async function POST(request: Request) {
       start_time:   result.start_time,
       end_time:     result.end_time,
       qty:          result.qty,
-      size_ml:      result.size_ml,
-      price:        result.price,
+      qty_50ml:     result.qty_50ml,
+      qty_100ml:    result.qty_100ml,
+      qty_kids:     result.qty_kids,
       amount:       result.amount,
       expires_at:   result.expires_at,
       snap_token:   snapToken,

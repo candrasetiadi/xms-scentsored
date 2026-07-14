@@ -7,13 +7,14 @@ interface Branch { id: string; name: string }
 interface Slot {
   id: string; branch_id: string; branch_name: string
   date: string; start_time: string; end_time: string
-  max_bookings: number; price: number; price_100ml: number; filled: number; available: number
-  notes: string | null
+  max_bookings: number; price: number; price_100ml: number; price_kids: number
+  filled: number; available: number; notes: string | null
 }
 
 interface Booking {
   id: string; customer_name: string; customer_phone: string
-  customer_email: string | null; qty: number; size_ml: number | null
+  customer_email: string | null; qty: number
+  qty_50ml: number; qty_100ml: number; qty_kids: number
   status: 'pending_payment' | 'confirmed' | 'cancelled' | 'expired'
   amount: number; expires_at: string | null; paid_at: string | null
   notes: string | null; queue_number: number; created_at: string
@@ -63,12 +64,13 @@ export function SlotsClient({ branches, defaultBranchId }: { branches: Branch[];
   const [bookingsLoading, setBookingsLoading] = useState(false)
 
   // Modal: buat slot satuan
-  const [showCreate,   setShowCreate]   = useState(false)
-  const [form,         setForm]         = useState({ date: '', start_time: '09:00', end_time: '11:00', max_bookings: 16, notes: '' })
-  const [formPrice50,  setFormPrice50]  = useState('285000')
-  const [formPrice100, setFormPrice100] = useState('450000')
-  const [creating,     setCreating]     = useState(false)
-  const [createErr,    setCreateErr]    = useState('')
+  const [showCreate,    setShowCreate]    = useState(false)
+  const [form,          setForm]          = useState({ date: '', start_time: '09:00', end_time: '11:00', max_bookings: 16, notes: '' })
+  const [formPrice50,   setFormPrice50]   = useState('285000')
+  const [formPrice100,  setFormPrice100]  = useState('450000')
+  const [formPriceKids, setFormPriceKids] = useState('200000')
+  const [creating,      setCreating]      = useState(false)
+  const [createErr,     setCreateErr]     = useState('')
 
   // Modal: generate jadwal bulk
   const [showGenerate,    setShowGenerate]    = useState(false)
@@ -77,6 +79,7 @@ export function SlotsClient({ branches, defaultBranchId }: { branches: Branch[];
   const [genMaxBook,      setGenMaxBook]      = useState(16)
   const [genPrice50,      setGenPrice50]      = useState<string>('285000')
   const [genPrice100,     setGenPrice100]     = useState<string>('450000')
+  const [genPriceKids,    setGenPriceKids]    = useState<string>('200000')
   const genSkipWeek = false
   const [generating,      setGenerating]      = useState(false)
   const [generateResult,  setGenerateResult]  = useState<{ created: number; skipped: number } | null>(null)
@@ -115,8 +118,9 @@ export function SlotsClient({ branches, defaultBranchId }: { branches: Branch[];
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         ...form,
-        price:       parseInt(formPrice50)  || 0,
-        price_100ml: parseInt(formPrice100) || 0,
+        price:       parseInt(formPrice50)   || 0,
+        price_100ml: parseInt(formPrice100)  || 0,
+        price_kids:  parseInt(formPriceKids) || 0,
         branch_id:   branchId,
       }),
     })
@@ -127,6 +131,7 @@ export function SlotsClient({ branches, defaultBranchId }: { branches: Branch[];
     setForm({ date: '', start_time: '09:00', end_time: '11:00', max_bookings: 16, notes: '' })
     setFormPrice50('285000')
     setFormPrice100('450000')
+    setFormPriceKids('200000')
     loadSlots()
   }
 
@@ -140,8 +145,9 @@ export function SlotsClient({ branches, defaultBranchId }: { branches: Branch[];
         from:         genFrom,
         to:           genTo,
         max_bookings: genMaxBook,
-        price:        parseInt(genPrice50)  || 0,
-        price_100ml:  parseInt(genPrice100) || 0,
+        price:        parseInt(genPrice50)    || 0,
+        price_100ml:  parseInt(genPrice100)   || 0,
+        price_kids:   parseInt(genPriceKids)  || 0,
         skip_weekends: genSkipWeek,
       }),
     })
@@ -192,7 +198,7 @@ export function SlotsClient({ branches, defaultBranchId }: { branches: Branch[];
         {/* Header */}
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="font-display text-[28px] text-pine">Booking Konsultasi</h1>
+            <h1 className="font-display text-[28px] text-pine">Raw Mat Experience</h1>
             <p className="text-sm text-ink-400 mt-0.5">Kelola slot jadwal dan lihat booking per sesi</p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
@@ -265,10 +271,11 @@ export function SlotsClient({ branches, defaultBranchId }: { branches: Branch[];
                           </div>
                           <div className={`flex items-center justify-between mt-1 text-xs ${isSelected ? 'text-white/60' : 'text-ink-400'}`}>
                             <span>{slot.filled}/{slot.max_bookings} booking</span>
-                            {(slot.price > 0 || slot.price_100ml > 0) && (
+                            {(slot.price > 0 || slot.price_100ml > 0 || slot.price_kids > 0) && (
                               <span className="text-right leading-tight">
                                 {slot.price > 0 && <span className="block">50ml {fmtRp(slot.price)}</span>}
                                 {slot.price_100ml > 0 && <span className="block">100ml {fmtRp(slot.price_100ml)}</span>}
+                                {slot.price_kids > 0 && <span className="block">Kids {fmtRp(slot.price_kids)}</span>}
                               </span>
                             )}
                           </div>
@@ -301,13 +308,41 @@ export function SlotsClient({ branches, defaultBranchId }: { branches: Branch[];
                       {fmtDate(selSlot.date)} · {selSlot.start_time.slice(0,5)}–{selSlot.end_time.slice(0,5)}
                     </p>
                     <div className="flex items-center gap-2 mt-1 flex-wrap">
-                      <span className="text-sm text-ink-500">{selSlot.filled}/{selSlot.max_bookings} booking</span>
+                      <span className="text-sm text-ink-500">{selSlot.filled}/{selSlot.max_bookings} peserta</span>
                       {selSlot.price > 0 && <span className="text-sm text-ink-400">· 50ml {fmtRp(selSlot.price)}</span>}
                       {selSlot.price_100ml > 0 && <span className="text-sm text-ink-400">· 100ml {fmtRp(selSlot.price_100ml)}</span>}
+                      {selSlot.price_kids > 0 && <span className="text-sm text-ink-400">· Kids {fmtRp(selSlot.price_kids)}</span>}
                       {selSlot.filled >= selSlot.max_bookings && (
                         <span className="text-[11px] font-bold bg-danger-bg text-danger px-1.5 py-0.5 rounded-full">PENUH</span>
                       )}
                     </div>
+                    {/* Ringkasan botol per ukuran dari booking aktif */}
+                    {(() => {
+                      const active = bookings.filter(b => b.status === 'confirmed' || b.status === 'pending_payment')
+                      const total50   = active.reduce((s, b) => s + (b.qty_50ml  ?? 0), 0)
+                      const total100  = active.reduce((s, b) => s + (b.qty_100ml ?? 0), 0)
+                      const totalKids = active.reduce((s, b) => s + (b.qty_kids  ?? 0), 0)
+                      if (total50 + total100 + totalKids === 0) return null
+                      return (
+                        <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                          {total50 > 0 && (
+                            <span className="text-[11px] font-medium bg-sand-100 text-ink-600 px-2 py-0.5 rounded-full">
+                              {total50} botol 50ml
+                            </span>
+                          )}
+                          {total100 > 0 && (
+                            <span className="text-[11px] font-medium bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">
+                              {total100} botol 100ml
+                            </span>
+                          )}
+                          {totalKids > 0 && (
+                            <span className="text-[11px] font-medium bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full">
+                              {totalKids} Kids 35ml
+                            </span>
+                          )}
+                        </div>
+                      )
+                    })()}
                   </div>
                   <button onClick={() => deactivateSlot(selSlot.id)}
                     className="text-xs px-2.5 py-1 rounded-lg border border-danger-bd text-danger hover:bg-danger-bg transition-colors">
@@ -340,22 +375,37 @@ export function SlotsClient({ branches, defaultBranchId }: { branches: Branch[];
                                 {b.queue_number}
                               </span>
                               <div className="min-w-0 space-y-0.5">
-                                {/* Nama + qty + size */}
+                                {/* Nama + breakdown per size */}
                                 <div className="flex items-center gap-1.5 flex-wrap">
                                   <p className={`text-sm font-semibold ${!isActive ? 'text-ink-400 line-through' : 'text-ink-900'}`}>
                                     {b.customer_name}
                                   </p>
-                                  {b.qty > 1 && (
+                                  {b.qty > 0 && (
                                     <span className="text-[10px] font-semibold bg-pine-50 text-pine px-1.5 py-0.5 rounded-full">
                                       {b.qty} orang
                                     </span>
                                   )}
-                                  {b.size_ml && (
-                                    <span className="text-[10px] font-semibold bg-sand-100 text-ink-500 px-1.5 py-0.5 rounded-full">
-                                      {b.size_ml}ml
-                                    </span>
-                                  )}
                                 </div>
+                                {/* Breakdown size */}
+                                {(b.qty_50ml > 0 || b.qty_100ml > 0 || b.qty_kids > 0) && (
+                                  <div className="flex items-center gap-1 flex-wrap mt-0.5">
+                                    {b.qty_50ml > 0 && (
+                                      <span className="text-[10px] font-medium bg-sand-100 text-ink-600 px-1.5 py-0.5 rounded-full">
+                                        {b.qty_50ml}× 50ml
+                                      </span>
+                                    )}
+                                    {b.qty_100ml > 0 && (
+                                      <span className="text-[10px] font-medium bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded-full">
+                                        {b.qty_100ml}× 100ml
+                                      </span>
+                                    )}
+                                    {b.qty_kids > 0 && (
+                                      <span className="text-[10px] font-medium bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded-full">
+                                        {b.qty_kids}× Kids
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
                                 {/* Kontak */}
                                 <p className="text-xs text-ink-600">{b.customer_phone}</p>
                                 {b.customer_email && (
@@ -448,7 +498,7 @@ export function SlotsClient({ branches, defaultBranchId }: { branches: Branch[];
               </div>
               <div>
                 <label className="text-xs font-medium text-ink-600 block mb-1">Harga per orang</label>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   <div>
                     <p className="text-[10px] text-ink-400 mb-1">50ml (Rp)</p>
                     <input
@@ -477,6 +527,21 @@ export function SlotsClient({ branches, defaultBranchId }: { branches: Branch[];
                       }}
                       className={inputCls}
                       placeholder="450000"
+                    />
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-ink-400 mb-1">Kids 35ml (Rp)</p>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      value={genPriceKids}
+                      onChange={e => {
+                        const v = e.target.value.replace(/[^0-9]/g, '')
+                        setGenPriceKids(v === '' ? '' : String(parseInt(v, 10)))
+                      }}
+                      className={inputCls}
+                      placeholder="200000"
                     />
                   </div>
                 </div>
@@ -538,7 +603,7 @@ export function SlotsClient({ branches, defaultBranchId }: { branches: Branch[];
               </div>
               <div>
                 <label className="text-xs font-medium text-ink-600 block mb-1">Harga per orang</label>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   <div>
                     <p className="text-[10px] text-ink-400 mb-1">50ml (Rp)</p>
                     <input
@@ -567,6 +632,21 @@ export function SlotsClient({ branches, defaultBranchId }: { branches: Branch[];
                       }}
                       className={inputCls}
                       placeholder="450000"
+                    />
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-ink-400 mb-1">Kids 35ml (Rp)</p>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      value={formPriceKids}
+                      onChange={e => {
+                        const v = e.target.value.replace(/[^0-9]/g, '')
+                        setFormPriceKids(v === '' ? '' : String(parseInt(v, 10)))
+                      }}
+                      className={inputCls}
+                      placeholder="200000"
                     />
                   </div>
                 </div>

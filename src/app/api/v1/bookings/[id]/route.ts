@@ -1,12 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
-import { isGoogleCalendarConfigured, updateEventDescription } from '@/lib/google-calendar'
 
 // PATCH /api/v1/bookings/:id
 // action: 'confirm' | 'cancel'
-// Confirm: admin manual confirm (pending_payment → confirmed)
-// Cancel: admin cancel booking (confirmed/pending_payment → cancelled)
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -35,14 +32,13 @@ export async function PATCH(
 
   if (!booking) return NextResponse.json({ error: { code: 'NOT_FOUND' } }, { status: 404 })
 
-  // Validasi transisi status
   if (body.action === 'confirm' && !['pending_payment', 'expired'].includes(booking.status))
     return NextResponse.json({ error: { code: 'VALIDATION', message: 'Hanya booking pending atau expired yang bisa dikonfirmasi.' } }, { status: 400 })
 
   if (body.action === 'cancel' && booking.status === 'cancelled')
     return NextResponse.json({ error: { code: 'VALIDATION', message: 'Booking sudah dibatalkan.' } }, { status: 400 })
 
-  const newStatus = body.action === 'confirm' ? 'confirmed' as const : 'cancelled' as const
+  const newStatus  = body.action === 'confirm' ? 'confirmed' as const : 'cancelled' as const
   const updateData = newStatus === 'confirmed'
     ? { status: newStatus, paid_at: new Date().toISOString() }
     : { status: newStatus }
@@ -56,42 +52,5 @@ export async function PATCH(
 
   if (error) return NextResponse.json({ error: { code: 'DB_ERROR', message: error.message } }, { status: 500 })
 
-  // Sync Calendar
-  if (isGoogleCalendarConfigured()) {
-    rebuildCalendarDescription(admin, booking.slot_id)
-      .catch(err => console.error('[Calendar] sync error after admin action:', err))
-  }
-
   return NextResponse.json({ data })
-}
-
-async function rebuildCalendarDescription(
-  admin: ReturnType<typeof createAdminClient>,
-  slotId: string,
-) {
-  const { data: slot } = await admin
-    .from('consultation_slots')
-    .select('calendar_event_id, max_bookings, branches!inner(name)')
-    .eq('id', slotId)
-    .single()
-
-  if (!slot?.calendar_event_id) return
-
-  const { data: bookings } = await admin
-    .from('consultation_bookings')
-    .select('queue_number, customer_name, customer_phone')
-    .eq('slot_id', slotId)
-    .eq('status', 'confirmed')
-    .order('queue_number')
-
-  await updateEventDescription({
-    eventId:     slot.calendar_event_id as string,
-    branchName:  ((slot.branches as unknown) as { name: string }).name,
-    maxBookings: slot.max_bookings,
-    bookings:    (bookings ?? []).map(b => ({
-      queueNumber: b.queue_number,
-      name:        b.customer_name,
-      phone:       b.customer_phone,
-    })),
-  })
 }

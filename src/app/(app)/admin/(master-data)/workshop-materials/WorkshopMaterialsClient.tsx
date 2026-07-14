@@ -134,7 +134,7 @@ export function WorkshopMaterialsClient({
       {/* Toolbar */}
       <div className="flex items-center gap-3 mb-4 flex-wrap">
         <input
-          placeholder="Cari bahan workshop…"
+          placeholder="Cari bahan Raw Mat Experience…"
           value={search}
           onChange={e => setSearch(e.target.value)}
           className={`${inputCls} flex-1 min-w-0`}
@@ -173,7 +173,7 @@ export function WorkshopMaterialsClient({
             {filtered.length === 0 && (
               <tr>
                 <td colSpan={6} className="px-4 py-10 text-center text-ink-400 text-sm">
-                  {search ? 'Tidak ada bahan yang cocok.' : 'Belum ada bahan workshop.'}
+                  {search ? 'Tidak ada bahan yang cocok.' : 'Belum ada bahan Raw Mat Experience.'}
                 </td>
               </tr>
             )}
@@ -221,7 +221,7 @@ export function WorkshopMaterialsClient({
           <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden">
             <div className="px-6 py-4 border-b border-line">
               <h2 className="font-semibold text-ink-900">
-                {modal === 'create' ? 'Tambah Bahan Workshop' : 'Edit Bahan Workshop'}
+                {modal === 'create' ? 'Tambah Bahan Raw Mat Experience' : 'Edit Bahan Raw Mat Experience'}
               </h2>
             </div>
 

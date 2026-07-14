@@ -13,6 +13,8 @@ interface Slot {
   end_time:     string
   max_bookings: number
   price:        number
+  price_100ml:  number
+  price_kids:   number
   filled:       number
   available:    number
   notes:        string | null
@@ -25,7 +27,9 @@ interface BookingResult {
   start_time:   string
   end_time:     string
   qty:          number
-  price:        number
+  qty_50ml:     number
+  qty_100ml:    number
+  qty_kids:     number
   amount:       number
   expires_at:   string | null
   qris:         { qr_string: string; expire_time: string } | null
@@ -75,7 +79,9 @@ export function BookingClient({ branches }: { branches: Branch[] }) {
   const [phone,      setPhone]      = useState('')
   const [email,      setEmail]      = useState('')
   const [notes,      setNotes]      = useState('')
-  const [qty,        setQty]        = useState(1)
+  const [qty50ml,    setQty50ml]    = useState(0)
+  const [qty100ml,   setQty100ml]   = useState(0)
+  const [qtyKids,    setQtyKids]    = useState(0)
   const [submitting, setSubmitting] = useState(false)
   const [formErr,    setFormErr]    = useState('')
   const [result,     setResult]     = useState<BookingResult | null>(null)
@@ -96,7 +102,7 @@ export function BookingClient({ branches }: { branches: Branch[] }) {
   }, [selectedBranch])
 
   // Reset qty jika slot berubah
-  useEffect(() => { setQty(1) }, [selectedSlot])
+  useEffect(() => { setQty50ml(0); setQty100ml(0); setQtyKids(0) }, [selectedSlot])
 
   // Auto-expire UI jika countdown habis
   useEffect(() => {
@@ -125,9 +131,18 @@ export function BookingClient({ branches }: { branches: Branch[] }) {
 
   useEffect(() => () => stopPolling(), [stopPolling])
 
+  const totalQty    = qty50ml + qty100ml + qtyKids
+  const totalAmount = selectedSlot
+    ? qty50ml * selectedSlot.price + qty100ml * selectedSlot.price_100ml + qtyKids * selectedSlot.price_kids
+    : 0
+
   async function handleSubmit() {
     if (!selectedSlot || !name.trim() || !phone.trim()) {
       setFormErr('Nama dan nomor HP wajib diisi.')
+      return
+    }
+    if (totalQty < 1) {
+      setFormErr('Pilih minimal 1 peserta (50ml, 100ml, atau Kids).')
       return
     }
     setSubmitting(true)
@@ -141,7 +156,9 @@ export function BookingClient({ branches }: { branches: Branch[] }) {
         customer_name:  name.trim(),
         customer_phone: phone.trim(),
         customer_email: email.trim() || undefined,
-        qty,
+        qty_50ml:       qty50ml,
+        qty_100ml:      qty100ml,
+        qty_kids:       qtyKids,
         notes:          notes.trim() || undefined,
       }),
     })
@@ -164,19 +181,18 @@ export function BookingClient({ branches }: { branches: Branch[] }) {
   function reset() {
     stopPolling()
     setStep('branch'); setSelectedBranch(null); setSelectedSlot(null)
-    setSlots([]); setName(''); setPhone(''); setEmail(''); setNotes(''); setQty(1)
+    setSlots([]); setName(''); setPhone(''); setEmail(''); setNotes('')
+    setQty50ml(0); setQty100ml(0); setQtyKids(0)
     setResult(null); setFormErr('')
   }
 
   const inputCls = 'w-full rounded-xl px-4 py-3 text-sm border outline-none focus:ring-2 focus:ring-pine-200 focus:border-pine border-line text-ink-900 bg-white'
 
-  const totalAmount = selectedSlot ? selectedSlot.price * qty : 0
-
   return (
     <div className="min-h-screen bg-sand-50 flex flex-col">
       <header className="bg-white border-b border-line px-4 py-4">
         <p className="font-display text-xl text-pine">Scentsored</p>
-        <p className="text-xs text-ink-500 mt-0.5">Booking Konsultasi Racik Parfum</p>
+        <p className="text-xs text-ink-500 mt-0.5">Raw Mat Experience</p>
       </header>
 
       <main className="flex-1 flex items-start justify-center px-4 py-8">
@@ -241,8 +257,18 @@ export function BookingClient({ branches }: { branches: Branch[] }) {
                             <p className="text-xs text-ink-500 mt-0.5">
                               {fmtTime(slot.start_time)} – {fmtTime(slot.end_time)}
                             </p>
-                            {slot.price > 0 && (
-                              <p className="text-xs text-pine font-medium mt-1">{fmtRp(slot.price)} / orang</p>
+                            {(slot.price > 0 || slot.price_100ml > 0 || slot.price_kids > 0) && (
+                              <div className="mt-1 space-y-0.5">
+                                {slot.price > 0 && (
+                                  <p className="text-xs text-pine font-medium">50ml {fmtRp(slot.price)}/org</p>
+                                )}
+                                {slot.price_100ml > 0 && (
+                                  <p className="text-xs text-pine font-medium">100ml {fmtRp(slot.price_100ml)}/org</p>
+                                )}
+                                {slot.price_kids > 0 && (
+                                  <p className="text-xs text-pine font-medium">Kids {fmtRp(slot.price_kids)}/org</p>
+                                )}
+                              </div>
                             )}
                             {slot.notes && <p className="text-xs text-ink-400 mt-1">{slot.notes}</p>}
                           </div>
@@ -296,31 +322,48 @@ export function BookingClient({ branches }: { branches: Branch[] }) {
                   <input value={email} onChange={e => setEmail(e.target.value)} placeholder="email@kamu.com" type="email" className={inputCls} />
                 </div>
 
-                {/* Jumlah orang */}
+                {/* Jumlah orang per ukuran */}
                 <div>
-                  <label className="text-xs font-medium text-ink-500 block mb-1">Jumlah Orang *</label>
-                  <div className="flex items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setQty(q => Math.max(1, q - 1))}
-                      className="w-10 h-10 rounded-xl border border-line bg-sand-50 flex items-center justify-center text-ink-700 hover:bg-sand-100 disabled:opacity-30 transition-colors"
-                      disabled={qty <= 1}>
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M20 12H4" />
-                      </svg>
-                    </button>
-                    <span className="w-8 text-center font-semibold text-ink-900 text-lg">{qty}</span>
-                    <button
-                      type="button"
-                      onClick={() => setQty(q => Math.min(selectedSlot.available, q + 1))}
-                      className="w-10 h-10 rounded-xl border border-line bg-sand-50 flex items-center justify-center text-ink-700 hover:bg-sand-100 disabled:opacity-30 transition-colors"
-                      disabled={qty >= selectedSlot.available}>
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                      </svg>
-                    </button>
-                    <span className="text-xs text-ink-400">(maks. {selectedSlot.available} orang)</span>
+                  <label className="text-xs font-medium text-ink-500 block mb-2">Pilih Ukuran & Jumlah *</label>
+                  <p className="text-xs text-ink-400 mb-3">Sisa kapasitas: {selectedSlot.available} orang</p>
+                  <div className="space-y-2">
+                    {[
+                      { label: '50ml',        sublabel: fmtRp(selectedSlot.price)       + '/orang', qty: qty50ml,  setQty: setQty50ml,  show: true },
+                      { label: '100ml',       sublabel: fmtRp(selectedSlot.price_100ml) + '/orang', qty: qty100ml, setQty: setQty100ml, show: selectedSlot.price_100ml > 0 },
+                      { label: 'Kids (35ml)', sublabel: fmtRp(selectedSlot.price_kids)  + '/orang', qty: qtyKids,  setQty: setQtyKids,  show: selectedSlot.price_kids  > 0 },
+                    ].filter(r => r.show).map(({ label, sublabel, qty: q, setQty: setQ }) => (
+                      <div key={label} className="flex items-center justify-between gap-3 rounded-xl border border-line bg-sand-50 px-4 py-3">
+                        <div>
+                          <p className="text-sm font-medium text-ink-900">{label}</p>
+                          <p className="text-xs text-ink-400">{sublabel}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setQ(v => Math.max(0, v - 1))}
+                            disabled={q <= 0}
+                            className="w-8 h-8 rounded-lg border border-line bg-white flex items-center justify-center text-ink-700 hover:bg-sand-100 disabled:opacity-30 transition-colors">
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M20 12H4" />
+                            </svg>
+                          </button>
+                          <span className="w-6 text-center font-semibold text-ink-900">{q}</span>
+                          <button
+                            type="button"
+                            onClick={() => setQ(v => Math.min(selectedSlot.available - totalQty + q, v + 1))}
+                            disabled={totalQty >= selectedSlot.available}
+                            className="w-8 h-8 rounded-lg border border-line bg-white flex items-center justify-center text-ink-700 hover:bg-sand-100 disabled:opacity-30 transition-colors">
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
+                  {totalQty > 0 && (
+                    <p className="text-xs text-pine font-medium mt-2">{totalQty} orang dipilih</p>
+                  )}
                 </div>
 
                 <div>
@@ -334,12 +377,27 @@ export function BookingClient({ branches }: { branches: Branch[] }) {
                 </div>
 
                 {/* Ringkasan harga */}
-                {selectedSlot.price > 0 && (
+                {totalQty > 0 && totalAmount > 0 && (
                   <div className="rounded-xl bg-sand-50 border border-line px-4 py-3 space-y-1">
-                    <div className="flex justify-between text-sm text-ink-500">
-                      <span>{fmtRp(selectedSlot.price)} × {qty} orang</span>
-                    </div>
-                    <div className="flex justify-between text-sm font-semibold text-ink-900">
+                    {qty50ml > 0 && selectedSlot.price > 0 && (
+                      <div className="flex justify-between text-xs text-ink-500">
+                        <span>50ml × {qty50ml}</span>
+                        <span>{fmtRp(qty50ml * selectedSlot.price)}</span>
+                      </div>
+                    )}
+                    {qty100ml > 0 && selectedSlot.price_100ml > 0 && (
+                      <div className="flex justify-between text-xs text-ink-500">
+                        <span>100ml × {qty100ml}</span>
+                        <span>{fmtRp(qty100ml * selectedSlot.price_100ml)}</span>
+                      </div>
+                    )}
+                    {qtyKids > 0 && selectedSlot.price_kids > 0 && (
+                      <div className="flex justify-between text-xs text-ink-500">
+                        <span>Kids × {qtyKids}</span>
+                        <span>{fmtRp(qtyKids * selectedSlot.price_kids)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between text-sm font-semibold text-ink-900 pt-1 border-t border-line">
                       <span>Total</span>
                       <span className="text-pine">{fmtRp(totalAmount)}</span>
                     </div>
@@ -352,9 +410,9 @@ export function BookingClient({ branches }: { branches: Branch[] }) {
 
                 <button
                   onClick={handleSubmit}
-                  disabled={submitting}
+                  disabled={submitting || totalQty < 1}
                   className="w-full h-12 rounded-xl bg-pine text-white font-semibold text-sm hover:bg-pine-700 disabled:opacity-50 transition-colors">
-                  {submitting ? 'Memproses...' : selectedSlot.price > 0 ? `Lanjut Bayar · ${fmtRp(totalAmount)}` : 'Konfirmasi Booking'}
+                  {submitting ? 'Memproses...' : totalAmount > 0 ? `Lanjut Bayar · ${fmtRp(totalAmount)}` : 'Konfirmasi Booking'}
                 </button>
               </div>
             </div>
