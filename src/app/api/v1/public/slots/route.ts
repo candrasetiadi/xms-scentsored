@@ -51,12 +51,12 @@ export async function GET(request: Request) {
 
   const admin = createAdminClient()
 
-  let query = admin
+  let query = (admin as any)
     .from('consultation_slots')
     .select(`
-      id, branch_id, date, start_time, end_time, max_bookings, notes,
+      id, branch_id, date, start_time, end_time, max_bookings, price, price_100ml, notes,
       branches!inner(id, name),
-      consultation_bookings(status)
+      consultation_bookings(status, qty)
     `)
     .eq('is_active', true)
     .gte('date', from)
@@ -74,9 +74,12 @@ export async function GET(request: Request) {
     )
   }
 
-  const result = (data ?? []).map(slot => {
-    const bookings = ((slot.consultation_bookings ?? []) as unknown) as { status: string }[]
-    const filled   = bookings.filter(b => b.status === 'confirmed').length
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const result = (data ?? []).map((slot: any) => {
+    const bookings = ((slot.consultation_bookings ?? []) as unknown) as { status: string; qty: number }[]
+    const filled   = bookings
+      .filter(b => b.status === 'confirmed' || b.status === 'pending_payment')
+      .reduce((sum, b) => sum + (b.qty ?? 1), 0)
     const branch   = (slot.branches as unknown) as { id: string; name: string }
     return {
       id:           slot.id,
@@ -86,6 +89,8 @@ export async function GET(request: Request) {
       start_time:   slot.start_time.slice(0, 5),
       end_time:     slot.end_time.slice(0, 5),
       max_bookings: slot.max_bookings,
+      price:        slot.price        ?? 0,
+      price_100ml:  slot.price_100ml  ?? 0,
       filled,
       available:    slot.max_bookings - filled,
       is_full:      filled >= slot.max_bookings,

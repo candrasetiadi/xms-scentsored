@@ -12,10 +12,10 @@ export async function GET(request: Request) {
   const from     = searchParams.get('from') ?? new Date().toISOString().slice(0, 10)
   const to       = searchParams.get('to')   ?? new Date(Date.now() + 30 * 86400_000).toISOString().slice(0, 10)
 
-  let query = supabase
+  let query = (supabase as any)
     .from('consultation_slots')
     .select(`
-      id, branch_id, date, start_time, end_time, max_bookings, price, notes, is_active,
+      id, branch_id, date, start_time, end_time, max_bookings, price, price_100ml, notes, is_active,
       branches!inner(id, name),
       consultation_bookings(id, status, qty)
     `)
@@ -30,7 +30,8 @@ export async function GET(request: Request) {
   const { data, error } = await query
   if (error) return NextResponse.json({ error: { code: 'DB_ERROR', message: error.message } }, { status: 500 })
 
-  const result = (data ?? []).map(slot => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const result = (data ?? []).map((slot: any) => {
     const bookings = ((slot.consultation_bookings ?? []) as unknown) as { status: string; qty: number }[]
     const filled   = bookings
       .filter(b => b.status === 'confirmed' || b.status === 'pending_payment')
@@ -42,8 +43,9 @@ export async function GET(request: Request) {
       date:         slot.date,
       start_time:   slot.start_time,
       end_time:     slot.end_time,
-      max_bookings: slot.max_bookings,
-      price:        slot.price,
+      max_bookings:  slot.max_bookings,
+      price:         slot.price,
+      price_100ml:   slot.price_100ml ?? 0,
       filled,
       available:    Math.max(0, slot.max_bookings - filled),
       notes:        slot.notes,
@@ -66,7 +68,7 @@ export async function POST(request: Request) {
 
   let body: {
     branch_id?: string; date: string; start_time: string; end_time: string
-    max_bookings?: number; price?: number; notes?: string
+    max_bookings?: number; price?: number; price_100ml?: number; notes?: string
   }
   try { body = await request.json() } catch {
     return NextResponse.json({ error: { code: 'VALIDATION', message: 'Body tidak valid.' } }, { status: 400 })
@@ -81,16 +83,17 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient()
 
-  const { data: slot, error } = await admin
+  const { data: slot, error } = await (admin as any)
     .from('consultation_slots')
     .insert({
       branch_id:    branchId,
       date:         body.date,
       start_time:   body.start_time,
       end_time:     body.end_time,
-      max_bookings: body.max_bookings ?? 16,
-      price:        body.price ?? 0,
-      notes:        body.notes ?? null,
+      max_bookings:  body.max_bookings ?? 16,
+      price:         body.price ?? 0,
+      price_100ml:   body.price_100ml ?? 0,
+      notes:         body.notes ?? null,
     })
     .select('id, date, start_time, end_time, max_bookings, price')
     .single()

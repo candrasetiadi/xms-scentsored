@@ -38,16 +38,17 @@ function validateApiKey(request: Request): boolean {
 // Endpoint untuk website eksternal. Memerlukan header: X-API-Key: <secret>
 //
 // Request body:
-//   slot_id        string  — wajib
-//   customer_name  string  — wajib
-//   customer_phone string  — wajib
-//   customer_email string  — opsional
-//   qty            number  — default 1
-//   notes          string  — opsional
+//   slot_id        string     — wajib
+//   customer_name  string     — wajib
+//   customer_phone string     — wajib
+//   customer_email string     — opsional
+//   qty            number     — default 1
+//   size_ml        50 | 100  — default 50
+//   notes          string     — opsional
 //
 // Response 201:
 //   { data: { booking_id, queue_number, slot_date, start_time, end_time,
-//             qty, price, amount, expires_at, snap_token, payment_url } }
+//             qty, size_ml, price, amount, expires_at, snap_token, payment_url } }
 
 export async function POST(request: Request) {
   if (!validateApiKey(request)) {
@@ -63,6 +64,7 @@ export async function POST(request: Request) {
     customer_phone:  string
     customer_email?: string
     qty?:            number
+    size_ml?:        50 | 100
     notes?:          string
   }
   try { body = await request.json() } catch {
@@ -79,15 +81,17 @@ export async function POST(request: Request) {
     )
   }
 
-  const qty   = Math.max(1, Math.floor(body.qty ?? 1))
-  const admin = createAdminClient()
+  const qty    = Math.max(1, Math.floor(body.qty ?? 1))
+  const sizeMl = body.size_ml === 100 ? 100 : 50
+  const admin  = createAdminClient()
 
-  const { data, error } = await admin.rpc('check_and_create_booking', {
+  const { data, error } = await (admin as any).rpc('check_and_create_booking', {
     p_slot_id:        body.slot_id,
     p_customer_name:  body.customer_name,
     p_customer_phone: body.customer_phone,
     p_customer_email: body.customer_email ?? null,
     p_qty:            qty,
+    p_size_ml:        sizeMl,
     p_notes:          body.notes ?? null,
   })
 
@@ -107,6 +111,7 @@ export async function POST(request: Request) {
     start_time:   string
     end_time:     string
     max_bookings: number
+    size_ml:      number
     price:        number
     qty:          number
     amount:       number
@@ -146,6 +151,7 @@ export async function POST(request: Request) {
       start_time:   result.start_time,
       end_time:     result.end_time,
       qty:          result.qty,
+      size_ml:      result.size_ml,
       price:        result.price,
       amount:       result.amount,
       expires_at:   result.expires_at,

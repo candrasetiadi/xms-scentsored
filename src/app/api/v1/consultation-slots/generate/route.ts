@@ -27,6 +27,8 @@ export async function POST(request: Request) {
     from: string
     to: string
     max_bookings?: number
+    price?: number
+    price_100ml?: number
     sessions?: { start_time: string; end_time: string }[]
     skip_weekends?: boolean
   }
@@ -46,6 +48,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: { code: 'VALIDATION', message: 'Rentang tanggal tidak valid.' } }, { status: 400 })
 
   const maxBookings  = body.max_bookings ?? 16
+  const price        = body.price       ?? 0
+  const price_100ml  = body.price_100ml ?? 0
   const sessions     = body.sessions ?? DEFAULT_SESSIONS
   const skipWeekends = body.skip_weekends ?? false
 
@@ -64,7 +68,8 @@ export async function POST(request: Request) {
   )
 
   // Build daftar slot baru
-  const toInsert: { branch_id: string; date: string; start_time: string; end_time: string; max_bookings: number; is_active: boolean }[] = []
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const toInsert: any[] = []
 
   const cur = new Date(fromDate)
   while (cur <= toDate) {
@@ -73,7 +78,7 @@ export async function POST(request: Request) {
       const dateStr = cur.toISOString().slice(0, 10)
       for (const session of sessions) {
         if (!existingSet.has(`${dateStr}|${session.start_time}`)) {
-          toInsert.push({ branch_id: branchId, date: dateStr, start_time: session.start_time, end_time: session.end_time, max_bookings: maxBookings, is_active: true })
+          toInsert.push({ branch_id: branchId, date: dateStr, start_time: session.start_time, end_time: session.end_time, max_bookings: maxBookings, price, price_100ml, is_active: true })
         }
       }
     }
@@ -84,7 +89,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ data: { created: 0, skipped: existingSlots?.length ?? 0 } })
   }
 
-  const { data: inserted, error: insertErr } = await admin
+  const { data: inserted, error: insertErr } = await (admin as any)
     .from('consultation_slots')
     .insert(toInsert)
     .select('id, date, start_time, end_time, max_bookings')

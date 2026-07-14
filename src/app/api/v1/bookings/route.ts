@@ -133,9 +133,9 @@ export async function GET(request: Request) {
   const slotId = searchParams.get('slot_id')
   const status = searchParams.get('status')
 
-  let query = supabase
+  let query = (supabase as any)
     .from('consultation_bookings')
-    .select('id, slot_id, customer_name, customer_phone, customer_email, qty, status, amount, expires_at, paid_at, notes, queue_number, created_at')
+    .select('id, slot_id, customer_name, customer_phone, customer_email, qty, size_ml, status, amount, expires_at, paid_at, notes, queue_number, created_at')
     .order('queue_number')
 
   if (slotId) query = query.eq('slot_id', slotId)
