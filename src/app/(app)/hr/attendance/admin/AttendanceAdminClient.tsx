@@ -15,14 +15,16 @@ interface Branch     { id: string; name: string }
 interface StaffItem  { id: string; name: string; branch_id: string | null }
 
 interface AttendanceRow {
-  id:             string
-  staff_name:     string
-  branch_name:    string
-  date:           string
-  clock_in_at:    string | null
-  clock_out_at:   string | null
-  worked_minutes: number | null
-  status:         string
+  id:              string
+  staff_name:      string
+  branch_name:     string
+  date:            string
+  clock_in_at:     string | null
+  clock_out_at:    string | null
+  worked_minutes:  number | null
+  status:          string
+  selfie_in_url:   string | null
+  selfie_out_url:  string | null
 }
 
 interface Summary { present: number; late: number; absent: number; on_leave: number }
@@ -145,6 +147,10 @@ export function AttendanceAdminClient({ branches, staffList, defaultBranchId }: 
   const [summary,  setSummary]  = useState<Summary>({ present: 0, late: 0, absent: 0, on_leave: 0 })
   const [loading,  setLoading]  = useState(true)
   const [error,    setError]    = useState<string | null>(null)
+
+  // Lightbox selfie
+  const [selfieUrl,   setSelfieUrl]   = useState<string | null>(null)
+  const [selfieLabel, setSelfieLabel] = useState('')
 
   // Manual input state
   const [manualOpen,    setManualOpen]    = useState(false)
@@ -305,6 +311,7 @@ export function AttendanceAdminClient({ branches, staffList, defaultBranchId }: 
               <Th>Keluar</Th>
               <Th right>Jam Kerja</Th>
               <Th>Status</Th>
+              <Th>Selfie</Th>
               <Th>Aksi</Th>
             </tr>
           </thead>
@@ -321,6 +328,45 @@ export function AttendanceAdminClient({ branches, staffList, defaultBranchId }: 
                 <Td right>{formatWorked(row.worked_minutes)}</Td>
                 <Td><StatusBadge status={row.status} /></Td>
                 <Td>
+                  <div className="flex items-center gap-1.5">
+                    {row.selfie_in_url ? (
+                      <button
+                        onClick={() => { setSelfieUrl(row.selfie_in_url); setSelfieLabel(`${row.staff_name} — Masuk`) }}
+                        title="Lihat selfie masuk"
+                        className="shrink-0"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={row.selfie_in_url}
+                          alt="selfie masuk"
+                          className="w-8 h-8 rounded-full object-cover border border-line hover:ring-2 hover:ring-pine-300 transition-all"
+                        />
+                      </button>
+                    ) : (
+                      <span className="w-8 h-8 rounded-full bg-sand-100 flex items-center justify-center" title="Tidak ada selfie masuk">
+                        <svg className="w-3.5 h-3.5 text-ink-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM18.75 10.5h.008v.008h-.008V10.5z" />
+                        </svg>
+                      </span>
+                    )}
+                    {row.selfie_out_url && (
+                      <button
+                        onClick={() => { setSelfieUrl(row.selfie_out_url); setSelfieLabel(`${row.staff_name} — Keluar`) }}
+                        title="Lihat selfie keluar"
+                        className="shrink-0"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={row.selfie_out_url}
+                          alt="selfie keluar"
+                          className="w-8 h-8 rounded-full object-cover border border-line hover:ring-2 hover:ring-pine-300 transition-all opacity-70"
+                        />
+                      </button>
+                    )}
+                  </div>
+                </Td>
+                <Td>
                   <button className="text-xs text-pine underline underline-offset-2 hover:no-underline">
                     Koreksi
                   </button>
@@ -329,6 +375,38 @@ export function AttendanceAdminClient({ branches, staffList, defaultBranchId }: 
             ))}
           </tbody>
         </TableWrapper>
+      )}
+
+      {/* Selfie lightbox */}
+      {selfieUrl && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-ink-900/70 p-4"
+          onClick={() => setSelfieUrl(null)}
+        >
+          <div
+            className="relative bg-white rounded-2xl overflow-hidden shadow-2xl max-w-sm w-full"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b border-line">
+              <p className="text-sm font-semibold text-ink-900">{selfieLabel}</p>
+              <button
+                onClick={() => setSelfieUrl(null)}
+                className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-sand-100 text-ink-400"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={selfieUrl}
+              alt={selfieLabel}
+              className="w-full object-cover"
+              style={{ maxHeight: '70vh' }}
+            />
+          </div>
+        </div>
       )}
 
       {/* Manual input sheet */}

@@ -33,7 +33,7 @@ export async function GET(request: Request) {
     const status   = searchParams.get('status')    ?? null
     const search   = searchParams.get('search')    ?? null
 
-    let q = supabase
+    let q = (supabase as any)
       .from('attendances')
       .select(`
         id,
@@ -42,6 +42,8 @@ export async function GET(request: Request) {
         clock_out,
         worked_minutes,
         status,
+        selfie_in_url,
+        selfie_out_url,
         staff:staff_id ( id, name, branch_id )
       `)
       .gte('work_date', from)
@@ -64,28 +66,51 @@ export async function GET(request: Request) {
       (branches ?? []).map(b => [b.id, b.name])
     )
 
+    // Generate signed URLs for all selfie paths in one batch
+    const BUCKET = 'attendance-selfies'
+    const EXPIRES = 60 * 60 // 1 jam
+
+    const allPaths = (rows ?? []).flatMap((row: any) => {
+      const paths: string[] = []
+      if (row.selfie_in_url)  paths.push(row.selfie_in_url)
+      if (row.selfie_out_url) paths.push(row.selfie_out_url)
+      return paths
+    })
+
+    const signedMap: Record<string, string> = {}
+    if (allPaths.length > 0) {
+      const { data: signed } = await supabase.storage
+        .from(BUCKET)
+        .createSignedUrls(allPaths, EXPIRES)
+      ;(signed ?? []).forEach((s: any) => {
+        if (s.path && s.signedUrl) signedMap[s.path] = s.signedUrl
+      })
+    }
+
     // Map + optional client-side search filter
     const searchLower = search?.toLowerCase() ?? ''
     const records = (rows ?? [])
       .map((row: any) => ({
-        id:             row.id,
-        date:           row.work_date,
-        clock_in_at:    row.clock_in,
-        clock_out_at:   row.clock_out,
-        worked_minutes: row.worked_minutes,
-        status:         row.status,
-        staff_name:     row.staff?.name ?? '–',
-        branch_name:    branchMap[row.staff?.branch_id] ?? '–',
+        id:              row.id,
+        date:            row.work_date,
+        clock_in_at:     row.clock_in,
+        clock_out_at:    row.clock_out,
+        worked_minutes:  row.worked_minutes,
+        status:          row.status,
+        staff_name:      row.staff?.name ?? '–',
+        branch_name:     branchMap[row.staff?.branch_id] ?? '–',
+        selfie_in_url:   row.selfie_in_url  ? (signedMap[row.selfie_in_url]  ?? null) : null,
+        selfie_out_url:  row.selfie_out_url ? (signedMap[row.selfie_out_url] ?? null) : null,
       }))
-      .filter(r =>
+      .filter((r: { staff_name: string }) =>
         !searchLower || r.staff_name.toLowerCase().includes(searchLower)
       )
 
     const summary = {
-      present:  records.filter(r => r.status === 'present').length,
-      late:     records.filter(r => r.status === 'late').length,
-      absent:   records.filter(r => r.status === 'absent').length,
-      on_leave: records.filter(r => r.status === 'on_leave').length,
+      present:  records.filter((r: { status: string }) => r.status === 'present').length,
+      late:     records.filter((r: { status: string }) => r.status === 'late').length,
+      absent:   records.filter((r: { status: string }) => r.status === 'absent').length,
+      on_leave: records.filter((r: { status: string }) => r.status === 'on_leave').length,
     }
 
     return NextResponse.json({ data: { records, summary } })
