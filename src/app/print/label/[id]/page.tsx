@@ -21,7 +21,7 @@ export default async function LabelPrintPage({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: item, error } = await (supabase as any)
     .from('order_items')
-    .select('id, product_id, qty, size_ml, customization_notes')
+    .select('id, order_id, product_id, qty, size_ml, customization_notes')
     .eq('id', orderItemId)
     .single()
 
@@ -31,13 +31,23 @@ export default async function LabelPrintPage({
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: product } = await (supabase as any)
-    .from('products')
-    .select('name, concentration')
-    .eq('id', item.product_id)
-    .single()
+  const [productRes, orderRes] = await Promise.all([
+    (supabase as any)
+      .from('products')
+      .select('name, concentration')
+      .eq('id', item.product_id)
+      .single(),
+    supabase
+      .from('orders')
+      .select('created_at')
+      .eq('id', item.order_id)
+      .single(),
+  ])
 
-  if (!product) redirect('/pos/history')
+  if (!productRes.data) redirect('/pos/history')
+
+  const product   = productRes.data
+  const orderDate = orderRes.data?.created_at ?? new Date().toISOString()
 
   // perfume_size: dari size_ml variant, fallback ke customization_notes
   const perfumeSize: string = item.size_ml
@@ -50,6 +60,8 @@ export default async function LabelPrintPage({
       perfumeSize={perfumeSize}
       perfumeType={product.concentration ?? 'EXTRAIT DE PARFUM'}
       printQty={Math.min(Math.max(1, parseInt(qtyParam ?? '1')), 20)}
+      orderItemId={orderItemId}
+      orderDate={orderDate}
     />
   )
 }

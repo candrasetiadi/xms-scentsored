@@ -8,13 +8,29 @@
 // no react imports needed
 
 interface Props {
-  perfumeName: string
-  perfumeSize: string  // e.g. "50 ml"
-  perfumeType: string  // e.g. "EXTRAIT DE PARFUM"
-  printQty:    number
+  perfumeName:  string
+  perfumeSize:  string   // e.g. "50 ml"
+  perfumeType:  string   // e.g. "EXTRAIT DE PARFUM"
+  printQty:     number
+  orderItemId:  string   // UUID order_item
+  orderDate:    string   // ISO timestamp order dibuat
 }
 
-export function LabelPrintClient({ perfumeName, perfumeSize, perfumeType, printQty }: Props) {
+// Format batch code: YYMMDD-XXXXXXXX-001
+// YYMMDD        = tanggal order
+// XXXXXXXX      = 8 char pertama order_item_id (tanpa strip)
+// 001            = nomor urut label (3 digit)
+function makeBatchCode(orderItemId: string, orderDate: string, seq: number): string {
+  const d    = new Date(orderDate)
+  const yy   = String(d.getFullYear()).slice(2)
+  const mm   = String(d.getMonth() + 1).padStart(2, '0')
+  const dd   = String(d.getDate()).padStart(2, '0')
+  const code = orderItemId.replace(/-/g, '').slice(0, 8).toUpperCase()
+  const s    = String(seq).padStart(3, '0')
+  return `${yy}${mm}${dd}-${code}-${s}`
+}
+
+export function LabelPrintClient({ perfumeName, perfumeSize, perfumeType, printQty, orderItemId, orderDate }: Props) {
   const labels = Array.from({ length: printQty })
 
   return (
@@ -40,6 +56,9 @@ export function LabelPrintClient({ perfumeName, perfumeSize, perfumeType, printQ
           <span style={{ fontSize:11, color:'#aaa', marginLeft:'auto' }}>
             Brother PT-P900W · TZe 36mm · 36×40mm
           </span>
+          <span style={{ fontSize:11, color:'#b45309', background:'#fffbeb', border:'1px solid #fde68a', borderRadius:4, padding:'2px 8px', marginLeft:8 }}>
+            ⚠ Windows: di dialog print → Paper size = 36×40mm · matikan Headers and footers
+          </span>
         </div>
 
         {/* ── Preview layar: 3× scale ── */}
@@ -47,11 +66,12 @@ export function LabelPrintClient({ perfumeName, perfumeSize, perfumeType, printQ
           {labels.map((_, i) => (
             <div key={i} className="label-preview">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/brand/logo_web.png" alt="Scentsored" className="lp-logo" />
+              <img src="/brand/logo-web-bold.svg" alt="Scentsored" className="lp-logo" />
               <p className="lp-name">{perfumeName}</p>
               <div className="lp-bottom">
                 <p className="lp-size">{perfumeSize}</p>
                 <p className="lp-type">{perfumeType}</p>
+                <p className="lp-batch">{makeBatchCode(orderItemId, orderDate, i + 1)}</p>
               </div>
             </div>
           ))}
@@ -63,11 +83,12 @@ export function LabelPrintClient({ perfumeName, perfumeSize, perfumeType, printQ
         {labels.map((_, i) => (
           <div key={i} className="label-print">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/brand/logo_web.png" alt="Scentsored" className="lp-logo" />
+            <img src="/brand/logo-web-bold.svg" alt="Scentsored" className="lp-logo" />
             <p className="lp-name">{perfumeName}</p>
             <div className="lp-bottom">
               <p className="lp-size">{perfumeSize}</p>
               <p className="lp-type">{perfumeType}</p>
+              <p className="lp-batch">{makeBatchCode(orderItemId, orderDate, i + 1)}</p>
             </div>
           </div>
         ))}
@@ -99,14 +120,15 @@ export function LabelPrintClient({ perfumeName, perfumeSize, perfumeType, printQ
         }
 
         .label-preview .lp-logo {
-          height: 27mm;    /* 3× of 9mm print height */
+          height: 31mm;
           width: auto;
           object-fit: contain;
           margin-top: 6mm;
         }
         .label-preview .lp-name {
           font-family: 'Chatime', Georgia, serif;
-          font-size: 24pt;       /* 8pt × 3 */
+          font-size: 24pt;
+          font-weight: 700;
           line-height: 1.2;
           margin: 0;
           word-break: break-word;
@@ -125,54 +147,79 @@ export function LabelPrintClient({ perfumeName, perfumeSize, perfumeType, printQ
           margin-bottom: 6mm;
         }
         .label-preview .lp-size {
-          font-size: 16.5pt;     /* 5.5pt × 3 */
+          font-size: 16.5pt;
+          font-weight: 700;
           letter-spacing: .06em;
           margin: 0;
         }
         .label-preview .lp-type {
-          font-size: 12pt;       /* 4pt × 3 */
+          font-size: 12pt;
+          font-weight: 600;
           letter-spacing: .14em;
           text-transform: uppercase;
           margin: 0;
         }
+        .label-preview .lp-batch {
+          font-size: 8pt;
+          font-weight: 700;
+          letter-spacing: .05em;
+          color: #333;
+          margin: 0;
+          margin-top: 1.5mm;
+          font-family: 'Courier New', monospace;
+        }
 
         /* ══ PRINT OUTPUT ══ */
         @media print {
-          html, body { margin: 0; padding: 0; background: white !important; }
+          html, body {
+            margin: 0 !important;
+            padding: 0 !important;
+            background: white !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
 
           #screen-controls { display: none !important; }
           #print-labels    { display: block !important; }
 
+          /*
+           * margin: 0 → menghilangkan area header/footer browser (URL, jam, halaman).
+           * Jika Windows Chrome/Edge masih muncul: buka More settings → matikan
+           * "Headers and footers". Paper size harus diset ke 36×40mm di print dialog.
+           */
           @page {
             size: 36mm 40mm;
-            margin: 0 2mm;        /* content area 32mm × 40mm */
+            margin: 0;
           }
 
           .label-print {
-            width: 32mm;
+            width: 36mm;
             height: 40mm;
             box-sizing: border-box;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: space-between;
-            padding: 2mm 1mm;
+            padding: 2mm 2mm;
             page-break-inside: avoid;
             background: white;
+            overflow: hidden;
           }
           .label-print:not(:last-child) {
             page-break-after: always;
           }
 
           .label-print .lp-logo {
-            height: 9mm;
+            height: 11mm;
             width: auto;
             object-fit: contain;
-            margin-top: 2mm;
-          }
+            margin-top: 1.5mm;
+            /* double drop-shadow menebalkan stroke logo di plastik */
+            }
           .label-print .lp-name {
             font-family: 'Chatime', Georgia, serif;
             font-size: 8pt;
+            font-weight: 700;
             line-height: 1.2;
             margin: 0;
             word-break: break-word;
@@ -188,18 +235,29 @@ export function LabelPrintClient({ perfumeName, perfumeSize, perfumeType, printQ
             flex-direction: column;
             align-items: center;
             gap: 0.5mm;
-            margin-bottom: 2mm;
+            margin-bottom: 1.5mm;
           }
           .label-print .lp-size {
             font-size: 5.5pt;
+            font-weight: 700;
             letter-spacing: .06em;
             margin: 0;
           }
           .label-print .lp-type {
             font-size: 4pt;
+            font-weight: 600;
             letter-spacing: .12em;
             text-transform: uppercase;
             margin: 0;
+          }
+          .label-print .lp-batch {
+            font-size: 3.5pt;
+            font-weight: 700;
+            letter-spacing: .04em;
+            color: #000;
+            margin: 0;
+            margin-top: 0.5mm;
+            font-family: 'Courier New', monospace;
           }
         }
       `}</style>

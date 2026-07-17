@@ -40,6 +40,8 @@ export default function LabelTestPage() {
           perfumeSize={size}
           perfumeType={type}
           printQty={qty}
+          orderItemId="00000000-0000-0000-0000-000000000000"
+          orderDate={new Date().toISOString()}
         />
       </div>
     )
