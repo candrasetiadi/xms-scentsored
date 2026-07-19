@@ -8,9 +8,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: staff } = await supabase
+  const { data: staff } = await (supabase as any)
     .from('staff')
-    .select('name, role, branch_id')
+    .select('name, role, branch_id, can_access_commission')
     .eq('auth_user_id', user.id)
     .eq('active', true)
     .single()
@@ -29,6 +29,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         role={(staff?.role ?? 'cashier') as Role}
         branchName={branchName}
         branchId={staff?.branch_id ?? null}
+        canAccessCommission={!!(staff as any)?.can_access_commission}
       />
       <main className="flex-1">{children}</main>
     </div>

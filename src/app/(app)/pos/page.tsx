@@ -30,11 +30,12 @@ export default async function PosPage({
 
   type VariantRow = { id: string; product_id: string; size_ml: number; price: number; label: string | null }
 
-  const [productsRes, productStockRes, edcRes, branchRes] = await Promise.all([
+  const [productsRes, productStockRes, edcRes, branchRes, driversRes] = await Promise.all([
     supabase.from('products').select('id, sku, name, category, type, price, image_url').eq('active', true).order('name'),
     supabase.from('product_stock').select('product_id, current_stock').eq('branch_id', branchId),
     supabase.from('edc_machines').select('id, bank_name, terminal_id, label').eq('branch_id', branchId).eq('active', true).order('bank_name'),
     supabase.from('branches').select('qris_image_url').eq('id', branchId).single(),
+    supabase.from('drivers').select('id, name, fee_value').eq('active', true).order('name'),
   ])
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -67,6 +68,7 @@ export default async function PosPage({
       stockMap={stockMap}
       edcMachines={edcRes.data ?? []}
       qrisImageUrl={branchRes.data?.qris_image_url ?? null}
+      drivers={driversRes.data ?? []}
     />
   )
 }

@@ -17,6 +17,8 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Produksi',    href: '/production',       roles: ['owner', 'admin', 'perfumer'] },
   { label: 'Procurement', href: '/procurement',      roles: ['owner', 'admin', 'stock_keeper'] },
   { label: 'Komisi',      href: '/admin/commissions',   roles: ['owner', 'admin'] },
+  { label: 'Atribusi Driver', href: '/admin/driver-attribution', roles: ['owner', 'admin'] },
+  { label: 'Commission Tracker', href: '/admin/commission-tracker', roles: ['owner', 'admin'] },
   { label: 'Laporan',     href: '/reporting',           roles: ['owner', 'admin'] },
   { label: 'Raw Mat Exp Schedule', href: '/admin/slots',    roles: ['owner', 'admin'] },
   { label: 'Raw Mat Exp Result',   href: '/admin/workshop', roles: ['owner', 'admin', 'cashier', 'perfumer', 'stock_keeper'] },
@@ -224,14 +226,18 @@ interface AppNavProps {
   role: Role
   branchName: string | null
   branchId?: string | null
+  canAccessCommission?: boolean
 }
 
-export function AppNav({ staffName, role, branchName, branchId = null }: AppNavProps) {
+export function AppNav({ staffName, role, branchName, branchId = null, canAccessCommission = false }: AppNavProps) {
   const pathname  = usePathname()
   const router    = useRouter()
   const [open, setOpen] = useState(false)
 
-  const visibleItems = NAV_ITEMS.filter(item => item.roles.includes(role))
+  const visibleItems = NAV_ITEMS.filter(item =>
+    item.roles.includes(role) ||
+    (canAccessCommission && item.href === '/admin/commission-tracker')
+  )
   const showBell     = NOTIF_ROLES.includes(role)
 
   // Change password

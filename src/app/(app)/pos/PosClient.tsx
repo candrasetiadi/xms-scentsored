@@ -34,6 +34,8 @@ interface SuccessData {
   method: PaymentMethod
 }
 
+interface DriverOption { id: string; name: string; fee_value: number }
+
 interface Props {
   staffId:      string
   staffName:    string
@@ -45,6 +47,7 @@ interface Props {
   stockMap:     Record<string, number>
   edcMachines:  EdcMachine[]
   qrisImageUrl: string | null
+  drivers:      DriverOption[]
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -72,7 +75,7 @@ const METHOD_ICON: Record<PaymentMethod, string> = {
 
 export function PosClient({
   staffId, staffName, staffRole, branchId, branches, products, variantMap, stockMap,
-  edcMachines, qrisImageUrl,
+  edcMachines, qrisImageUrl, drivers,
 }: Props) {
   const router   = useRouter()
   const pathname = usePathname()
@@ -99,6 +102,9 @@ export function PosClient({
   // Success data
   const [successData, setSuccessData] = useState<SuccessData | null>(null)
 
+
+  // Driver state (opsional)
+  const [selectedDriverId, setSelectedDriverId] = useState<string>('')
 
   // Sales/PIC state — auto-fill dengan akun login, bisa diubah
   const [salesStaffId,   setSalesStaffId]   = useState<string>(staffId)
@@ -227,6 +233,7 @@ export function PosClient({
     setPayModalOpen(false)
     setPayMethod(null)
     setEdcMachineId('')
+    setSelectedDriverId('')
     setScreen('pos')
   }
 
@@ -259,7 +266,7 @@ export function PosClient({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           branch_id:      branchId,
-          driver_id:      null,
+          driver_id:      selectedDriverId || null,
           sales_staff_id: salesStaffId || null,
           customer_name:  custName || null,
           customer_phone: custPhone || null,
@@ -670,6 +677,31 @@ export function PosClient({
 
             {/* Body */}
             <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
+
+              {/* Driver dropdown (opsional) */}
+              {drivers.length > 0 && (
+                <div>
+                  <label
+                    htmlFor="pos-driver-select"
+                    className="text-xs font-medium text-ink-600 block mb-1.5"
+                  >
+                    Driver (opsional)
+                  </label>
+                  <select
+                    id="pos-driver-select"
+                    value={selectedDriverId}
+                    onChange={e => setSelectedDriverId(e.target.value)}
+                    className={`${inputCls} w-full`}
+                  >
+                    <option value="">Tidak ada driver</option>
+                    {drivers.map(d => (
+                      <option key={d.id} value={d.id}>
+                        {d.name} ({d.fee_value}%)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {/* Method grid */}
               <div className="grid grid-cols-3 gap-2.5">
