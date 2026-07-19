@@ -73,8 +73,10 @@ export function AutocompleteInput({
   }
 
   function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
-    onInputChange(e.target.value)
-    onChange('', e.target.value)
+    const val = e.target.value
+    onInputChange(val)
+    const exactOpt = options.find(o => o.name.toLowerCase() === val.trim().toLowerCase())
+    onChange(exactOpt ? exactOpt.id : '', val)
     setOpen(true)
   }
 
