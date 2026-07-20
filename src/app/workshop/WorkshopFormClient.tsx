@@ -6,7 +6,6 @@ import {
   useRef,
   useCallback,
   useMemo,
-  useId,
 } from 'react'
 import { useRouter } from 'next/navigation'
 
@@ -85,8 +84,6 @@ function fmtSlotLabel(slot: SlotOption) {
 }
 const fmtGram = (n: number) => n % 1 === 0 ? `${n}g` : `${n.toFixed(2)}g`
 
-
-// Rumus normalisasi: gram_per_drop = targetGrams / total_drops (guard /0)
 function computeGrams(drops: number | '', totalDrops: number, targetGrams: number): number {
   if (totalDrops === 0 || drops === '' || drops === 0) return 0
   return (targetGrams / totalDrops) * (drops as number)
@@ -94,8 +91,6 @@ function computeGrams(drops: number | '', totalDrops: number, targetGrams: numbe
 
 let _keyCounter = 0
 function nextKey() { return String(++_keyCounter) }
-
-// ── useDebounce ───────────────────────────────────────────────────────────────
 
 function useDebounce<T>(value: T, delay: number): T {
   const [debounced, setDebounced] = useState(value)
@@ -198,13 +193,14 @@ function MaterialPicker({ materials, selectedIds, onSelect, onClose }: MaterialP
         {categories.map(cat => (
           <button
             key={cat.id}
-            onClick={() => setCategoryFilter(prev => prev === cat.id ? null : cat.id)}
-            className="flex-shrink-0 text-xs px-3 py-1 rounded-full font-medium border transition-colors"
-            style={
+            onClick={() => setCategoryFilter(f => f === cat.id ? null : cat.id)}
+            className={[
+              'flex-shrink-0 text-xs px-3 py-1 rounded-full font-medium border transition-colors',
               categoryFilter === cat.id
-                ? { backgroundColor: cat.color_hex, color: '#fff', borderColor: cat.color_hex }
-                : { backgroundColor: cat.color_hex + '20', color: cat.color_hex, borderColor: cat.color_hex + '40' }
-            }
+                ? 'text-white border-transparent'
+                : 'bg-white text-ink-600 border-line hover:bg-sand-50',
+            ].join(' ')}
+            style={categoryFilter === cat.id ? { backgroundColor: cat.color_hex, borderColor: cat.color_hex } : {}}
           >
             {cat.name}
           </button>
@@ -213,15 +209,14 @@ function MaterialPicker({ materials, selectedIds, onSelect, onClose }: MaterialP
 
       <div className="flex-1 overflow-y-auto divide-y divide-line">
         {filtered.length === 0 ? (
-          <div className="flex items-center justify-center py-16 text-ink-400 text-sm">
-            No ingredients found
-          </div>
+          <p className="px-4 py-8 text-sm text-ink-400 text-center">No ingredients found</p>
         ) : (
           filtered.map(m => {
             const alreadyAdded = selectedIds.has(m.id)
             return (
               <button
                 key={m.id}
+                type="button"
                 onClick={() => { onSelect(m); onClose() }}
                 className="w-full text-left px-4 py-3.5 flex items-center gap-3 hover:bg-sand-50 active:bg-sand-100 transition-colors"
               >
@@ -255,95 +250,50 @@ function MaterialPicker({ materials, selectedIds, onSelect, onClose }: MaterialP
   )
 }
 
-// ── PerfumeNameSheet ──────────────────────────────────────────────────────────
+// ── Participant model ─────────────────────────────────────────────────────────
 
-const PERFUME_NAME_PLACEHOLDERS = [
-  'e.g. Sunset at Dago',
-  'e.g. First Rain',
-  'e.g. Your name / someone you love',
-]
+interface Participant {
+  _pid:          string
+  step:          'info' | 'formulation'
+  name:          string
+  phoneDialCode: string
+  phoneNumber:   string
+  social:        string
+  segment:       Segment
+  selectedMl:    number
+  perfumeName:   string
+  theme:         string
+  notes:         string
+  items:         FormulationItem[]
+  submitError:   string
+}
 
-function PerfumeNameSheet({
-  defaultValue, submitting, error, onSubmit, onClose,
-}: {
-  defaultValue: string
-  submitting:   boolean
-  error:        string
-  onSubmit:     (name: string) => void
-  onClose:      () => void
-}) {
-  const [value, setValue] = useState(defaultValue)
-  const inputRef = useRef<HTMLInputElement>(null)
-  const [placeholder] = useState(
-    () => PERFUME_NAME_PLACEHOLDERS[Math.floor(Math.random() * PERFUME_NAME_PLACEHOLDERS.length)]
-  )
-
-  useEffect(() => { setTimeout(() => inputRef.current?.focus(), 100) }, [])
-
-  return (
-    <div className="fixed inset-0 z-50 flex flex-col justify-end">
-      <button className="absolute inset-0 bg-ink-900/50" onClick={onClose} aria-label="Close" />
-      <div className="relative bg-white rounded-t-2xl px-5 pt-5 pb-8 pb-safe-bottom shadow-xl">
-        <div className="w-10 h-1 bg-sand-300 rounded-full mx-auto mb-5" />
-        <h3 className="text-[17px] font-semibold text-ink-900 leading-snug mb-4">
-          Your perfume has a story — what will you call it?
-        </h3>
-        <div className="relative mb-1">
-          <input
-            ref={inputRef}
-            type="text"
-            value={value}
-            onChange={e => setValue(e.target.value.slice(0, 15))}
-            placeholder={placeholder}
-            maxLength={15}
-            className={[
-              'w-full rounded-xl px-4 py-3.5 text-sm border outline-none focus:ring-2 text-ink-900 bg-white placeholder:text-ink-300',
-              value.length >= 15
-                ? 'border-danger focus:ring-danger/20 focus:border-danger'
-                : 'border-line focus:ring-pine-200 focus:border-pine',
-            ].join(' ')}
-            onKeyDown={e => { if (e.key === 'Enter' && value.trim()) onSubmit(value) }}
-          />
-          <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-[11px] tabular-nums ${value.length >= 15 ? 'text-danger font-medium' : 'text-ink-300'}`}>
-            {value.length}/15
-          </span>
-        </div>
-        {value.length >= 15 && (
-          <p className="text-xs text-danger mb-3">Maximum 15 characters reached.</p>
-        )}
-        {error && (
-          <p className="text-xs text-danger bg-danger-bg border border-danger-bd rounded-xl px-3 py-2 mb-3">{error}</p>
-        )}
-        <button
-          onClick={() => onSubmit(value)}
-          disabled={!value.trim() || submitting}
-          className="w-full py-4 rounded-2xl bg-pine text-white text-base font-semibold disabled:opacity-40 hover:bg-pine-700 active:scale-[0.98] transition-all"
-        >
-          {submitting ? 'Saving…' : 'Save Formulation'}
-        </button>
-      </div>
-    </div>
-  )
+function mkParticipant(): Participant {
+  return {
+    _pid:          nextKey(),
+    step:          'info',
+    name:          '',
+    phoneDialCode: DEFAULT_DIAL,
+    phoneNumber:   '',
+    social:        '',
+    segment:       'adult',
+    selectedMl:    50,
+    perfumeName:   '',
+    theme:         '',
+    notes:         '',
+    items:         [],
+    submitError:   '',
+  }
 }
 
 // ── Draft persistence ─────────────────────────────────────────────────────────
 
-const DRAFT_KEY = 'workshop_formulation_draft'
+const DRAFT_KEY = 'workshop_draft_v2'
 
 interface DraftData {
   savedAt:        number
-  step:           'info' | 'formulation'
-  name:           string
-  phoneDialCode:  string
-  phoneNumber:    string
-  social:         string
-  perfumeName:    string
-  theme:          string
-  notes:          string
   selectedSlotId: string
-  selectedMl:     number
-  segment:        Segment
-  items:          FormulationItem[]
+  participants:   Omit<Participant, 'submitError'>[]
 }
 
 function loadDraft(): DraftData | null {
@@ -356,13 +306,11 @@ function loadDraft(): DraftData | null {
       return null
     }
     return d
-  } catch {
-    return null
-  }
+  } catch { return null }
 }
 
 function saveDraft(d: DraftData) {
-  try { localStorage.setItem(DRAFT_KEY, JSON.stringify(d)) } catch { /* quota exceeded */ }
+  try { localStorage.setItem(DRAFT_KEY, JSON.stringify(d)) } catch { /* quota */ }
 }
 
 function clearDraft() {
@@ -376,11 +324,7 @@ function timeAgo(ts: number) {
   return `${Math.floor(mins / 60)} hr ago`
 }
 
-// ── WorkshopFormClient ────────────────────────────────────────────────────────
-
-interface Props { initialSlotId: string | null; editToken: string | null }
-
-type Step = 'info' | 'formulation'
+// ── Constants ─────────────────────────────────────────────────────────────────
 
 const INPUT_CLS =
   'w-full rounded-xl px-4 py-3.5 text-sm border outline-none focus:ring-2 focus:ring-pine-200 focus:border-pine border-line text-ink-900 bg-white placeholder:text-ink-300'
@@ -388,111 +332,78 @@ const INPUT_CLS =
 const SELECT_CLS =
   'w-full rounded-xl px-4 py-3.5 text-sm border outline-none focus:ring-2 focus:ring-pine-200 focus:border-pine border-line text-ink-900 bg-white'
 
+const MAX_PARTICIPANTS = 6
+
+// ── WorkshopFormClient ────────────────────────────────────────────────────────
+
+interface Props { initialSlotId: string | null; editToken: string | null }
+
+interface SubmitResult { name: string; token: string; url: string }
+
 export function WorkshopFormClient({ initialSlotId, editToken }: Props) {
-  const router  = useRouter()
-  const isEdit  = !!editToken
+  const router = useRouter()
+  const isEdit = !!editToken
 
-  const [step, setStep] = useState<Step>('info')
-
-  const [name,          setName]          = useState('')
-  const [phoneDialCode, setPhoneDialCode] = useState(DEFAULT_DIAL)
-  const [phoneNumber,   setPhoneNumber]   = useState('')
-  const [social,        setSocial]        = useState('')
-  const [perfumeName, setPerfumeName] = useState('')
-  const [theme,       setTheme]       = useState('')
-  const [notes,       setNotes]       = useState('')
-
+  // ── Shared state ──
+  const [selectedSlotId, setSelectedSlotId] = useState<string>(initialSlotId ?? '')
   const [slots,          setSlots]          = useState<SlotOption[]>([])
   const [slotsLoading,   setSlotsLoading]   = useState(true)
-  const [selectedSlotId, setSelectedSlotId] = useState<string>(initialSlotId ?? '')
-
   const [materials,        setMaterials]        = useState<WorkshopMaterial[]>([])
   const [materialsLoading, setMaterialsLoading] = useState(false)
   const [materialsError,   setMaterialsError]   = useState('')
 
-  const [items,      setItems]      = useState<FormulationItem[]>([])
-  const [showPicker, setShowPicker] = useState(false)
+  // ── Participants ──
+  const [participants, setParticipants] = useState<Participant[]>([mkParticipant()])
+  const [activeTab,    setActiveTab]    = useState(0)
 
-  const [selectedMl,  setSelectedMl]  = useState<number>(50)
-  const [segment,     setSegment]     = useState<Segment>('adult')
-
-  const [submitting,    setSubmitting]    = useState(false)
-  const [submitError,   setSubmitError]   = useState('')
-  const [showNameSheet, setShowNameSheet] = useState(false)
-
-  const [hasDraft,     setHasDraft]     = useState(false)
+  // ── UI state ──
+  const [showPicker,  setShowPicker]  = useState(false)
+  const [submitting,  setSubmitting]  = useState(false)
+  const [submitted,   setSubmitted]   = useState<SubmitResult[]>([])
+  const [hasDraft,    setHasDraft]    = useState(false)
   const [draftSavedAt, setDraftSavedAt] = useState<number | null>(null)
-
   const [editLoading, setEditLoading] = useState(isEdit)
 
-  const nameId        = useId()
-  const phoneId       = useId()
-  const socialId      = useId()
-  const perfumeNameId = useId()
-  const themeId       = useId()
-  const notesId       = useId()
-  const slotId_       = useId()
+  const p = participants[activeTab] ?? participants[0]
 
+  function updateP(patch: Partial<Participant>) {
+    setParticipants(prev => prev.map((pp, i) => i === activeTab ? { ...pp, ...patch } : pp))
+  }
+
+  // ── Draft ──
   useEffect(() => {
-    if (isEdit) return  // skip draft detection in edit mode
+    if (isEdit) return
     const draft = loadDraft()
-    if (draft && (draft.name || draft.items.length > 0)) {
+    if (draft && (draft.participants.some(pp => pp.name || pp.items.length > 0))) {
       setHasDraft(true)
       setDraftSavedAt(draft.savedAt)
     }
   }, [isEdit])
 
-  // Pre-fill from existing formulation when in edit mode
+  const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {
-    if (!editToken) return
-    setEditLoading(true)
-    fetch(`/api/v1/public/workshop/formulations/${editToken}`)
-      .then(r => r.json())
-      .then(json => {
-        const d = json.data
-        if (!d) return
-        setName(d.customer?.name ?? '')
-        // Parse phone back into dial code + number (stored as E.164)
-        const phone = d.customer?.phone ?? ''
-        const matched = COUNTRY_CODES.find(c => phone.startsWith(c.dial))
-        if (matched) {
-          setPhoneDialCode(matched.dial)
-          setPhoneNumber(phone.slice(matched.dial.length))
-        } else if (phone) {
-          setPhoneDialCode(DEFAULT_DIAL)
-          setPhoneNumber(phone)
-        }
-        setSocial(d.contact_socmed ?? '')
-        setPerfumeName(d.perfume_name ?? '')
-        setTheme(d.theme ?? '')
-        setNotes(d.notes ?? '')
-        if (d.slot_id) setSelectedSlotId(d.slot_id)
-        setItems((d.items ?? []).map((item: { material_id: string; drops: number }) => ({
-          _key:        nextKey(),
-          material_id: item.material_id,
-          drops:       item.drops ?? 1,
-        })))
-        setStep('formulation')
+    if (isEdit || hasDraft || submitted.length > 0) return
+    if (draftTimerRef.current) clearTimeout(draftTimerRef.current)
+    draftTimerRef.current = setTimeout(() => {
+      const isEmpty = participants.every(pp => !pp.name && pp.items.length === 0)
+      if (isEmpty) return
+      const now = Date.now()
+      saveDraft({
+        savedAt: now,
+        selectedSlotId,
+        participants: participants.map(({ submitError: _e, ...rest }) => rest),
       })
-      .catch(() => { /* silent — user can fill manually */ })
-      .finally(() => setEditLoading(false))
-  }, [editToken]) // eslint-disable-line react-hooks/exhaustive-deps
+      setDraftSavedAt(now)
+    }, 800)
+    return () => { if (draftTimerRef.current) clearTimeout(draftTimerRef.current) }
+  }, [participants, selectedSlotId, hasDraft, isEdit, submitted.length])
 
   function resumeDraft() {
     const draft = loadDraft()
     if (!draft) return
-    setStep(draft.step)
-    setName(draft.name)
-    setPhoneDialCode(draft.phoneDialCode ?? DEFAULT_DIAL)
-    setPhoneNumber(draft.phoneNumber ?? '')
-    setSocial(draft.social)
-    setPerfumeName(draft.perfumeName)
-    setTheme(draft.theme)
-    setNotes(draft.notes)
     setSelectedSlotId(draft.selectedSlotId || initialSlotId || '')
-    if (draft.selectedMl) setSelectedMl(draft.selectedMl)
-    if (draft.segment)    setSegment(draft.segment)
-    setItems(draft.items)
+    setParticipants(draft.participants.map(pp => ({ ...pp, submitError: '' })))
+    setActiveTab(0)
     setHasDraft(false)
   }
 
@@ -501,20 +412,45 @@ export function WorkshopFormClient({ initialSlotId, editToken }: Props) {
     setHasDraft(false)
   }
 
-  const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // ── Edit mode prefill ──
   useEffect(() => {
-    if (isEdit || hasDraft) return
-    if (draftTimerRef.current) clearTimeout(draftTimerRef.current)
-    draftTimerRef.current = setTimeout(() => {
-      const isEmpty = !name && !phoneNumber && !social && !perfumeName && !theme && !notes && items.length === 0
-      if (isEmpty) return
-      const now = Date.now()
-      saveDraft({ savedAt: now, step, name, phoneDialCode, phoneNumber, social, perfumeName, theme, notes, selectedSlotId, selectedMl, segment, items })
-      setDraftSavedAt(now)
-    }, 800)
-    return () => { if (draftTimerRef.current) clearTimeout(draftTimerRef.current) }
-  }, [step, name, phoneDialCode, phoneNumber, social, perfumeName, theme, notes, selectedSlotId, selectedMl, segment, items, hasDraft, isEdit])
+    if (!editToken) return
+    setEditLoading(true)
+    fetch(`/api/v1/public/workshop/formulations/${editToken}`)
+      .then(r => r.json())
+      .then(json => {
+        const d = json.data
+        if (!d) return
+        const phone = d.customer?.phone ?? ''
+        const matched = COUNTRY_CODES.find(c => phone.startsWith(c.dial))
+        const dialCode  = matched ? matched.dial : DEFAULT_DIAL
+        const numPart   = matched ? phone.slice(matched.dial.length) : phone
+        setParticipants([{
+          _pid:          nextKey(),
+          step:          'formulation',
+          name:          d.customer?.name ?? '',
+          phoneDialCode: dialCode,
+          phoneNumber:   numPart,
+          social:        d.contact_socmed ?? '',
+          segment:       'adult',
+          selectedMl:    SIZE_OPTIONS.find(o => o.grams === d.target_grams)?.ml ?? 50,
+          perfumeName:   d.perfume_name ?? '',
+          theme:         d.theme ?? '',
+          notes:         d.notes ?? '',
+          items:         (d.items ?? []).map((item: { material_id: string; drops: number }) => ({
+            _key:        nextKey(),
+            material_id: item.material_id,
+            drops:       item.drops ?? 1,
+          })),
+          submitError: '',
+        }])
+        if (d.slot_id) setSelectedSlotId(d.slot_id)
+      })
+      .catch(() => { /* silent */ })
+      .finally(() => setEditLoading(false))
+  }, [editToken]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Fetch slots ──
   const fetchSlots = useCallback(async () => {
     setSlotsLoading(true)
     try {
@@ -524,15 +460,13 @@ export function WorkshopFormClient({ initialSlotId, editToken }: Props) {
       const list: SlotOption[] = json.data ?? []
       setSlots(list)
       if (!initialSlotId && list.length === 1) setSelectedSlotId(list[0].id)
-    } catch {
-      // silent — slot is optional
-    } finally {
-      setSlotsLoading(false)
-    }
+    } catch { /* silent */ }
+    finally { setSlotsLoading(false) }
   }, [initialSlotId])
 
   useEffect(() => { fetchSlots() }, [fetchSlots])
 
+  // ── Fetch materials ──
   useEffect(() => {
     if (materials.length > 0) return
     setMaterialsLoading(true)
@@ -544,102 +478,142 @@ export function WorkshopFormClient({ initialSlotId, editToken }: Props) {
       .finally(() => setMaterialsLoading(false))
   }, [materials.length])
 
+  // ── Derived values for active participant ──
   const materialMap = useMemo(() => {
     const m = new Map<string, WorkshopMaterial>()
     materials.forEach(mat => m.set(mat.id, mat))
     return m
   }, [materials])
 
-  const selectedMaterialIds = useMemo(
-    () => new Set(items.map(i => i.material_id)),
-    [items],
-  )
-
   const filteredMaterials = useMemo(
-    () => materials.filter(m => m.segment === (segment === 'kids' ? 'kids' : 'regular')),
-    [materials, segment],
+    () => materials.filter(m => m.segment === (p.segment === 'kids' ? 'kids' : 'regular')),
+    [materials, p.segment],
   )
 
-  // Computed grams (real-time, normalisasi proporsional)
-  const totalDrops = useMemo(
-    () => items.reduce((s, i) => s + (typeof i.drops === 'number' ? i.drops : 0), 0),
-    [items],
+  const selectedMaterialIds = useMemo(
+    () => new Set(p.items.map(i => i.material_id)),
+    [p.items],
   )
-  const targetGrams = SIZE_OPTIONS.find(o => o.ml === selectedMl)?.grams ?? 30
-  const canSubmit   = items.length > 0 && totalDrops > 0
-  const canProceed  = name.trim() !== '' && phoneNumber.trim() !== '' && theme.trim() !== ''
 
+  const totalDrops   = useMemo(() => p.items.reduce((s, i) => s + (typeof i.drops === 'number' ? i.drops : 0), 0), [p.items])
+  const targetGrams  = SIZE_OPTIONS.find(o => o.ml === p.selectedMl)?.grams ?? 30
+  const canProceed   = p.name.trim() !== '' && p.phoneNumber.trim() !== '' && p.theme.trim() !== ''
+  const canSubmitOne = p.items.length > 0 && totalDrops > 0
+  const allReady     = participants.every(pp => pp.step === 'formulation' && pp.items.length > 0 && pp.items.reduce((s, i) => s + (typeof i.drops === 'number' ? i.drops : 0), 0) > 0)
+
+  // ── Item handlers (active participant) ──
   function handleAddMaterial(material: WorkshopMaterial) {
-    setItems(prev => [...prev, { _key: nextKey(), material_id: material.id, drops: 1 }])
+    updateP({ items: [...p.items, { _key: nextKey(), material_id: material.id, drops: 1 }] })
   }
 
   function handleRemoveItem(key: string) {
-    setItems(prev => prev.filter(i => i._key !== key))
+    updateP({ items: p.items.filter(i => i._key !== key) })
   }
 
   function handleDropsChange(key: string, value: number | '') {
-    setItems(prev => prev.map(i => i._key === key ? { ...i, drops: value } : i))
+    updateP({ items: p.items.map(i => i._key === key ? { ...i, drops: value } : i) })
   }
 
-  async function handleSubmit(finalPerfumeName: string) {
-    setSubmitError('')
+  // ── Participant tabs ──
+  function addParticipant() {
+    if (participants.length >= MAX_PARTICIPANTS) return
+    const newP = mkParticipant()
+    setParticipants(prev => [...prev, newP])
+    setActiveTab(participants.length)
+  }
+
+  function removeParticipant(idx: number) {
+    if (participants.length <= 1) return
+    setParticipants(prev => prev.filter((_, i) => i !== idx))
+    setActiveTab(prev => Math.min(prev, participants.length - 2))
+  }
+
+  // ── Submit ──
+  async function handleSubmitAll() {
+    if (submitting) return
     setSubmitting(true)
-    try {
-      const itemsPayload = items.map(({ material_id, drops }) => ({
+    const results: SubmitResult[] = []
+    const updatedParticipants = [...participants]
+
+    for (let i = 0; i < participants.length; i++) {
+      const pp = participants[i]
+      updatedParticipants[i] = { ...pp, submitError: '' }
+
+      const itemsPayload = pp.items.map(({ material_id, drops }) => ({
         material_id,
         drops: typeof drops === 'number' ? drops : 0,
       }))
+      const tg = SIZE_OPTIONS.find(o => o.ml === pp.selectedMl)?.grams ?? 30
 
-      let res: Response
-      if (isEdit && editToken) {
-        res = await fetch(`/api/v1/public/workshop/formulations/${editToken}`, {
-          method:  'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({
-            contact_socmed: social.trim() || null,
-            perfume_name:   finalPerfumeName.trim(),
-            theme:          theme.trim()  || null,
-            notes:          notes.trim()  || null,
-            target_grams:   targetGrams,
-            items:          itemsPayload,
-          }),
-        })
-      } else {
-        res = await fetch('/api/v1/public/workshop/formulations', {
-          method:  'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({
-            customer_name:   name.trim(),
-            customer_phone:  phoneNumber.trim()
-              ? phoneDialCode + phoneNumber.trim().replace(/^0+/, '')
-              : undefined,
-            customer_social: social.trim() || undefined,
-            perfume_name:    finalPerfumeName.trim(),
-            theme:           theme.trim()  || undefined,
-            notes:           notes.trim()  || undefined,
-            slot_id:         selectedSlotId || undefined,
-            target_grams:    targetGrams,
-            items:           itemsPayload,
-          }),
-        })
-      }
+      try {
+        let res: Response
+        if (isEdit && editToken && i === 0) {
+          res = await fetch(`/api/v1/public/workshop/formulations/${editToken}`, {
+            method:  'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({
+              contact_socmed: pp.social.trim() || null,
+              perfume_name:   pp.perfumeName.trim() || null,
+              theme:          pp.theme.trim()  || null,
+              notes:          pp.notes.trim()  || null,
+              target_grams:   tg,
+              items:          itemsPayload,
+            }),
+          })
+        } else {
+          res = await fetch('/api/v1/public/workshop/formulations', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({
+              customer_name:   pp.name.trim(),
+              customer_phone:  pp.phoneNumber.trim()
+                ? pp.phoneDialCode + pp.phoneNumber.trim().replace(/^0+/, '')
+                : undefined,
+              customer_social: pp.social.trim() || undefined,
+              perfume_name:    pp.perfumeName.trim() || undefined,
+              theme:           pp.theme.trim()  || undefined,
+              notes:           pp.notes.trim()  || undefined,
+              slot_id:         selectedSlotId   || undefined,
+              target_grams:    tg,
+              items:           itemsPayload,
+            }),
+          })
+        }
 
-      const json = await res.json()
-      if (!res.ok) {
-        setSubmitError(json.error?.message ?? json.error ?? 'Failed to save formulation. Please try again.')
-        return
+        const json = await res.json()
+        if (!res.ok) {
+          updatedParticipants[i] = {
+            ...updatedParticipants[i],
+            submitError: json.error?.message ?? json.error ?? 'Failed to save. Please try again.',
+          }
+        } else {
+          const token = isEdit && editToken && i === 0 ? editToken : json.data.access_token
+          results.push({ name: pp.name, token, url: `/workshop/result/${token}` })
+        }
+      } catch {
+        updatedParticipants[i] = {
+          ...updatedParticipants[i],
+          submitError: 'Connection failed. Check your internet and try again.',
+        }
       }
-      clearDraft()
-      const token = isEdit ? editToken : json.data.access_token
-      router.push(`/workshop/result/${token}`)
-    } catch {
-      setSubmitError('Connection failed. Check your internet and try again.')
-    } finally {
-      setSubmitting(false)
+    }
+
+    setParticipants(updatedParticipants)
+    setSubmitting(false)
+
+    const hasErrors = updatedParticipants.some(pp => pp.submitError)
+    if (hasErrors) return
+
+    clearDraft()
+
+    if (results.length === 1) {
+      router.push(results[0].url)
+    } else {
+      setSubmitted(results)
     }
   }
 
-  // ── Edit loading screen ───────────────────────────────────────────────────
+  // ── Edit loading ──
   if (editLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-sand-50">
@@ -651,164 +625,305 @@ export function WorkshopFormClient({ initialSlotId, editToken }: Props) {
     )
   }
 
-  // ── Step 1: Info ───────────────────────────────────────────────────────────
-
-  if (step === 'info') {
+  // ── Success screen (multi-participant) ──
+  if (submitted.length > 0) {
     return (
-      <div className="flex-1 flex flex-col px-4 py-6 max-w-md mx-auto w-full">
+      <div className="flex-1 flex flex-col px-4 py-8 max-w-md mx-auto w-full">
+        <div className="text-center mb-8">
+          <div className="w-14 h-14 rounded-full bg-pine-50 flex items-center justify-center mx-auto mb-4">
+            <svg className="w-7 h-7 text-pine" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <h2 className="text-xl font-semibold text-ink-900">All formulations saved!</h2>
+          <p className="text-sm text-ink-400 mt-1">Share each result link with the participant.</p>
+        </div>
 
-        {hasDraft && (
-          <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 space-y-2">
-            <div className="flex items-start gap-2">
-              <svg className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+        <div className="space-y-3">
+          {submitted.map((r, i) => (
+            <a
+              key={r.token}
+              href={r.url}
+              className="flex items-center gap-3 bg-white border border-line rounded-2xl px-4 py-3.5 hover:bg-sand-50 transition-colors"
+            >
+              <span className="w-8 h-8 rounded-full bg-pine-50 text-pine text-sm font-semibold flex items-center justify-center flex-shrink-0">
+                {i + 1}
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-ink-900 truncate">{r.name}</p>
+                <p className="text-xs text-ink-400 truncate">{r.url}</p>
+              </div>
+              <svg className="w-4 h-4 text-ink-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
               </svg>
-              <div className="flex-1">
-                <p className="text-sm font-semibold text-amber-800">You have an unfinished formulation</p>
-                <p className="text-xs text-amber-700 mt-0.5">
-                  Saved {draftSavedAt ? timeAgo(draftSavedAt) : ''}. Continue where you left off?
-                </p>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <button onClick={resumeDraft} className="flex-1 py-2 rounded-xl bg-amber-500 text-white text-sm font-semibold hover:bg-amber-600 transition-colors">
-                Continue
-              </button>
-              <button onClick={discardDraft} className="flex-1 py-2 rounded-xl border border-amber-300 text-amber-700 text-sm font-medium hover:bg-amber-100 transition-colors">
-                Start Fresh
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Progress */}
-        <div className="flex items-center gap-2 mb-6">
-          <div className="flex items-center gap-1.5">
-            <span className="w-6 h-6 rounded-full bg-pine text-white text-xs font-semibold flex items-center justify-center">1</span>
-            <span className="text-sm font-semibold text-ink-900 uppercase tracking-wide">YOUR INFO</span>
-          </div>
-          <div className="flex-1 h-px bg-line" />
-          <div className="flex items-center gap-1.5">
-            <span className="w-6 h-6 rounded-full bg-sand-200 text-ink-400 text-xs font-semibold flex items-center justify-center">2</span>
-            <span className="text-sm text-ink-400 uppercase tracking-wide">PERFUME FORMULATION</span>
-          </div>
-        </div>
-
-        <div className="space-y-4 flex-1">
-
-          <div>
-            <label htmlFor={slotId_} className="block text-xs font-semibold text-ink-500 mb-1.5 uppercase tracking-wide">
-              Raw Mat Experience Session
-            </label>
-            {slotsLoading ? (
-              <div className="w-full rounded-xl border border-line bg-sand-100 py-3.5 px-4 text-sm text-ink-400 animate-pulse">
-                Loading sessions...
-              </div>
-            ) : slots.length === 0 ? (
-              <div className="w-full rounded-xl border border-line bg-sand-50 py-3.5 px-4 text-sm text-ink-400">
-                No sessions today
-              </div>
-            ) : (
-              <select id={slotId_} value={selectedSlotId} onChange={e => setSelectedSlotId(e.target.value)} className={SELECT_CLS}>
-                <option value="">— Select a session —</option>
-                {slots.map(slot => (
-                  <option key={slot.id} value={slot.id}>{fmtSlotLabel(slot)}</option>
-                ))}
-              </select>
-            )}
-          </div>
-
-          <div>
-            <label htmlFor={nameId} className="block text-xs font-semibold text-ink-500 mb-1.5 uppercase tracking-wide">
-              Full Name <span className="text-danger">*</span>
-            </label>
-            <input id={nameId} type="text" value={name} onChange={e => setName(e.target.value)}
-              placeholder="Your name" autoComplete="name" maxLength={100} className={INPUT_CLS} />
-          </div>
-
-          <div>
-            <label htmlFor={phoneId} className="block text-xs font-semibold text-ink-500 mb-1.5 uppercase tracking-wide">
-              WhatsApp <span className="text-danger">*</span>
-            </label>
-            <div className="flex gap-2">
-              <select
-                value={phoneDialCode}
-                onChange={e => setPhoneDialCode(e.target.value)}
-                className="flex-shrink-0 rounded-xl px-3 py-3.5 text-sm border border-line outline-none focus:ring-2 focus:ring-pine-200 focus:border-pine bg-white text-ink-900"
-                style={{ width: '7rem' }}
-              >
-                {COUNTRY_CODES.map(c => (
-                  <option key={c.dial + c.name} value={c.dial}>
-                    {c.flag} {c.dial}
-                  </option>
-                ))}
-              </select>
-              <input
-                id={phoneId}
-                type="tel"
-                value={phoneNumber}
-                onChange={e => setPhoneNumber(e.target.value)}
-                placeholder="812-3456-7890"
-                autoComplete="tel-national"
-                maxLength={15}
-                className={INPUT_CLS}
-              />
-            </div>
-            <p className="text-[11px] text-ink-400 mt-1">Enter number without leading zero — e.g. 812-3456-7890</p>
-          </div>
-
-          <div>
-            <label htmlFor={socialId} className="block text-xs font-semibold text-ink-500 mb-1.5 uppercase tracking-wide">
-              Instagram
-            </label>
-            <input id={socialId} type="text" value={social} onChange={e => setSocial(e.target.value)}
-              placeholder="@username" autoComplete="off" maxLength={30} className={INPUT_CLS} />
-          </div>
-
-          <div>
-            <label htmlFor={themeId} className="block text-xs font-semibold text-ink-500 mb-1.5 uppercase tracking-wide">
-              Perfume Theme <span className="text-danger">*</span>
-            </label>
-            <input id={themeId} type="text" value={theme} onChange={e => setTheme(e.target.value)}
-              placeholder="e.g. Fresh & Sporty" autoComplete="off" maxLength={80} className={INPUT_CLS} />
-          </div>
-
-          <div>
-            <label htmlFor={notesId} className="block text-xs font-semibold text-ink-500 mb-1.5 uppercase tracking-wide">
-              Notes
-            </label>
-            <textarea id={notesId} value={notes} onChange={e => setNotes(e.target.value)}
-              placeholder="Any preferences or special requests? (optional)"
-              rows={3} maxLength={400} className={INPUT_CLS + ' resize-none'} />
-            <p className="text-[11px] text-ink-400 mt-1 text-right">{notes.length}/400</p>
-          </div>
-        </div>
-
-        <div className="pt-6">
-          <button
-            onClick={() => setStep('formulation')}
-            disabled={!canProceed}
-            className="w-full py-4 rounded-2xl bg-pine text-white text-base font-semibold disabled:opacity-40 hover:bg-pine-700 active:scale-[0.98] transition-all"
-          >
-            Next — Perfume Formulation
-          </button>
-          {!canProceed && (
-            <p className="text-xs text-ink-400 text-center mt-2">Please fill in Full Name, WhatsApp Number, and Perfume Theme first</p>
-          )}
+            </a>
+          ))}
         </div>
       </div>
     )
   }
 
-  // ── Step 2: Formulation ────────────────────────────────────────────────────
+  // ── Draft banner ──
+  const draftBanner = hasDraft && (
+    <div className="mx-4 mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 space-y-2">
+      <div className="flex items-start gap-2">
+        <svg className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+        </svg>
+        <div className="flex-1">
+          <p className="text-sm font-semibold text-amber-800">You have an unfinished formulation</p>
+          <p className="text-xs text-amber-700 mt-0.5">Saved {draftSavedAt ? timeAgo(draftSavedAt) : ''}. Continue where you left off?</p>
+        </div>
+      </div>
+      <div className="flex gap-2">
+        <button onClick={resumeDraft} className="flex-1 py-2 rounded-xl bg-amber-500 text-white text-sm font-semibold hover:bg-amber-600 transition-colors">Continue</button>
+        <button onClick={discardDraft} className="flex-1 py-2 rounded-xl border border-amber-300 text-amber-700 text-sm font-medium hover:bg-amber-100 transition-colors">Start Fresh</button>
+      </div>
+    </div>
+  )
+
+  // ── Shared tab row (used in both step 1 and step 2 sticky headers) ──
+  function renderTabs() {
+    if (isEdit) return null
+    return (
+      <div className="flex gap-1.5 overflow-x-auto scrollbar-hide px-4 pb-2 max-w-md mx-auto">
+        {participants.map((pp, i) => {
+          const done     = pp.step === 'formulation' && pp.items.length > 0
+          const isActive = i === activeTab
+          return (
+            <div key={pp._pid} className="relative flex-shrink-0">
+              <button
+                onClick={() => setActiveTab(i)}
+                className={[
+                  'flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border',
+                  isActive ? 'bg-pine text-white border-pine' : 'bg-white text-ink-600 border-line hover:bg-sand-50',
+                ].join(' ')}
+              >
+                {done && (
+                  <svg className={`w-3 h-3 flex-shrink-0 ${isActive ? 'text-white' : 'text-pine'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+                {pp.name.trim() || `Participant ${i + 1}`}
+              </button>
+              {participants.length > 1 && (
+                <button
+                  onClick={() => removeParticipant(i)}
+                  aria-label={`Remove Participant ${i + 1}`}
+                  className={[
+                    'absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold leading-none transition-colors',
+                    isActive ? 'bg-pine-700 text-white' : 'bg-sand-300 text-ink-500 hover:bg-danger hover:text-white',
+                  ].join(' ')}
+                >
+                  ×
+                </button>
+              )}
+            </div>
+          )
+        })}
+        {participants.length < MAX_PARTICIPANTS && (
+          <button
+            onClick={addParticipant}
+            className="flex-shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold text-ink-400 border border-dashed border-line hover:border-pine hover:text-pine transition-colors"
+          >
+            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+            </svg>
+            Add
+          </button>
+        )}
+      </div>
+    )
+  }
+
+  // ── Step 1 sticky header ──
+  const step1Header = (
+    <div className="sticky top-0 z-20 bg-white border-b border-line">
+      <div className="flex items-center gap-2 px-4 py-3 max-w-md mx-auto">
+        <div className="flex items-center gap-1.5">
+          <span className="w-6 h-6 rounded-full bg-pine text-white text-xs font-semibold flex items-center justify-center">1</span>
+          <span className="text-sm font-semibold text-ink-900 uppercase tracking-wide">YOUR INFO</span>
+        </div>
+        <div className="flex-1 h-px bg-line" />
+        <div className="flex items-center gap-1.5">
+          <span className="w-6 h-6 rounded-full bg-sand-200 text-ink-400 text-xs font-semibold flex items-center justify-center">2</span>
+          <span className="text-sm text-ink-400 uppercase tracking-wide">FORMULATION</span>
+        </div>
+      </div>
+      {renderTabs()}
+    </div>
+  )
+
+  // ── Step 1: Info ──────────────────────────────────────────────────────────
+
+  if (p.step === 'info') {
+    return (
+      <>
+        {step1Header}
+        {draftBanner}
+
+        <div className="flex-1 flex flex-col px-4 py-4 max-w-md mx-auto w-full pb-32">
+          <div className="space-y-4">
+
+            {!isEdit && (
+              <div>
+                <label className="block text-xs font-semibold text-ink-500 mb-1.5 uppercase tracking-wide">
+                  Raw Mat Experience Session
+                </label>
+                {slotsLoading ? (
+                  <div className="w-full rounded-xl border border-line bg-sand-100 py-3.5 px-4 text-sm text-ink-400 animate-pulse">Loading sessions...</div>
+                ) : slots.length === 0 ? (
+                  <div className="w-full rounded-xl border border-line bg-sand-50 py-3.5 px-4 text-sm text-ink-400">No sessions today</div>
+                ) : (
+                  <select value={selectedSlotId} onChange={e => setSelectedSlotId(e.target.value)} className={SELECT_CLS}>
+                    <option value="">— Select a session —</option>
+                    {slots.map(slot => (
+                      <option key={slot.id} value={slot.id}>{fmtSlotLabel(slot)}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            )}
+
+            <div>
+              <label className="block text-xs font-semibold text-ink-500 mb-1.5 uppercase tracking-wide">
+                Full Name <span className="text-danger">*</span>
+              </label>
+              <input type="text" value={p.name} onChange={e => updateP({ name: e.target.value })}
+                placeholder="Your name" autoComplete="name" maxLength={100} className={INPUT_CLS} />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-ink-500 mb-1.5 uppercase tracking-wide">
+                WhatsApp <span className="text-danger">*</span>
+              </label>
+              <div className="flex gap-2">
+                <select
+                  value={p.phoneDialCode}
+                  onChange={e => updateP({ phoneDialCode: e.target.value })}
+                  className="flex-shrink-0 rounded-xl px-3 py-3.5 text-sm border border-line outline-none focus:ring-2 focus:ring-pine-200 focus:border-pine bg-white text-ink-900"
+                  style={{ width: '7rem' }}
+                >
+                  {COUNTRY_CODES.map(c => (
+                    <option key={c.dial + c.name} value={c.dial}>{c.flag} {c.dial}</option>
+                  ))}
+                </select>
+                <input
+                  type="tel"
+                  value={p.phoneNumber}
+                  onChange={e => updateP({ phoneNumber: e.target.value })}
+                  placeholder="812-3456-7890"
+                  autoComplete="tel-national"
+                  maxLength={15}
+                  className={INPUT_CLS}
+                />
+              </div>
+              <p className="text-[11px] text-ink-400 mt-1">Enter number without leading zero — e.g. 812-3456-7890</p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-ink-500 mb-1.5 uppercase tracking-wide">Instagram</label>
+              <input type="text" value={p.social} onChange={e => updateP({ social: e.target.value })}
+                placeholder="@username" autoComplete="off" maxLength={30} className={INPUT_CLS} />
+            </div>
+
+            {/* Segment selector — moved from step 2 */}
+            <div>
+              <label className="block text-xs font-semibold text-ink-500 mb-1.5 uppercase tracking-wide">For</label>
+              <div className="flex gap-2">
+                {(['adult', 'kids'] as const).map(seg => (
+                  <button
+                    key={seg}
+                    type="button"
+                    onClick={() => {
+                      if (seg === p.segment) return
+                      updateP({ segment: seg, items: [], selectedMl: seg === 'kids' ? 35 : p.selectedMl })
+                    }}
+                    className={[
+                      'flex-1 rounded-xl py-3 text-center border-2 transition-all',
+                      p.segment === seg ? 'border-pine bg-pine-50' : 'border-line bg-sand-50 hover:border-pine-200',
+                    ].join(' ')}
+                  >
+                    <p className={`text-sm font-bold ${p.segment === seg ? 'text-pine' : 'text-ink-700'}`}>
+                      {seg === 'adult' ? 'Adult' : 'Kids'}
+                    </p>
+                    <p className={`text-[10px] mt-0.5 ${p.segment === seg ? 'text-pine-600' : 'text-ink-400'}`}>
+                      {seg === 'adult' ? '35 / 50 / 100 ml' : '35 ml only'}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Bottle size — moved from step 2 */}
+            <div>
+              <label className="block text-xs font-semibold text-ink-500 mb-1.5 uppercase tracking-wide">Bottle Size</label>
+              <div className="flex gap-2">
+                {SIZE_OPTIONS.filter(opt => p.segment === 'kids' ? opt.ml === 35 : true).map(opt => (
+                  <button
+                    key={opt.ml}
+                    type="button"
+                    onClick={() => updateP({ selectedMl: opt.ml })}
+                    className={[
+                      'flex-1 rounded-xl py-3 text-center border-2 transition-all',
+                      p.selectedMl === opt.ml ? 'border-pine bg-pine-50' : 'border-line bg-sand-50 hover:border-pine-200',
+                    ].join(' ')}
+                  >
+                    <p className={`text-sm font-bold ${p.selectedMl === opt.ml ? 'text-pine' : 'text-ink-700'}`}>{opt.ml} ml</p>
+                    <p className={`text-[10px] mt-0.5 ${p.selectedMl === opt.ml ? 'text-pine-600' : 'text-ink-400'}`}>{opt.grams} gram</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-ink-500 mb-1.5 uppercase tracking-wide">
+                Perfume Theme <span className="text-danger">*</span>
+              </label>
+              <input type="text" value={p.theme} onChange={e => updateP({ theme: e.target.value })}
+                placeholder="e.g. Fresh & Sporty" autoComplete="off" maxLength={80} className={INPUT_CLS} />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-ink-500 mb-1.5 uppercase tracking-wide">Notes</label>
+              <textarea
+                value={p.notes}
+                onChange={e => updateP({ notes: e.target.value })}
+                placeholder="Any preferences or special requests? (optional)"
+                rows={3} maxLength={400}
+                className={INPUT_CLS + ' resize-none'}
+              />
+              <p className="text-[11px] text-ink-400 mt-1 text-right">{p.notes.length}/400</p>
+            </div>
+
+          </div>
+
+          <div className="pt-6">
+            <button
+              onClick={() => updateP({ step: 'formulation' })}
+              disabled={!canProceed}
+              className="w-full py-4 rounded-2xl bg-pine text-white text-base font-semibold disabled:opacity-40 hover:bg-pine-700 active:scale-[0.98] transition-all"
+            >
+              Next — Perfume Formulation
+            </button>
+            {!canProceed && (
+              <p className="text-xs text-ink-400 text-center mt-2">Please fill in Full Name, WhatsApp Number, and Perfume Theme first</p>
+            )}
+          </div>
+        </div>
+      </>
+    )
+  }
+
+  // ── Step 2: Formulation ───────────────────────────────────────────────────
 
   return (
     <>
-      {/* Sticky step header (no progress bar) */}
-      <div className="sticky top-0 z-20 bg-white border-b border-line px-4 py-3">
-        <div className="flex items-center gap-2">
+      {/* Sticky header */}
+      <div className="sticky top-0 z-20 bg-white border-b border-line">
+        <div className="flex items-center gap-2 px-4 pt-3 pb-2 max-w-md mx-auto">
           <button
-            onClick={() => setStep('info')}
+            onClick={() => updateP({ step: 'info' })}
             aria-label="Back to your info"
             className="p-1 -ml-1 rounded-md text-ink-400 hover:text-ink-700"
           >
@@ -820,91 +935,41 @@ export function WorkshopFormClient({ initialSlotId, editToken }: Props) {
             <span className="w-6 h-6 rounded-full bg-sand-200 text-ink-400 text-xs font-semibold flex items-center justify-center">1</span>
             <div className="w-8 h-px bg-line" />
             <span className="w-6 h-6 rounded-full bg-pine text-white text-xs font-semibold flex items-center justify-center">2</span>
-            <span className="text-sm font-semibold text-ink-900 uppercase tracking-wide">PERFUME FORMULATION</span>
+            <span className="text-sm font-semibold text-ink-900 uppercase tracking-wide">FORMULATION</span>
           </div>
-          {draftSavedAt && (
-            <p className="ml-auto text-[10px] text-ink-300 flex items-center gap-1 flex-shrink-0">
-              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
-              Saved {timeAgo(draftSavedAt)}
-            </p>
-          )}
+          <div className="ml-auto flex items-center gap-2 flex-shrink-0">
+            <span className="text-xs text-ink-400">{p.name.trim() || `Participant ${activeTab + 1}`}</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-sand-100 text-ink-500">
+              {p.selectedMl}ml · {p.segment === 'kids' ? 'Kids' : 'Adult'}
+            </span>
+            {draftSavedAt && (
+              <p className="text-[10px] text-ink-300 flex items-center gap-1">
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+                Saved {timeAgo(draftSavedAt)}
+              </p>
+            )}
+          </div>
         </div>
+        {renderTabs()}
       </div>
 
       {/* Item list */}
       <div className="flex-1 px-4 pt-4 pb-36 space-y-3 max-w-md mx-auto w-full">
 
-        {/* Segment selector */}
-        <div className="bg-white border border-line rounded-2xl p-4">
-          <p className="text-[10px] font-semibold text-ink-400 uppercase tracking-widest mb-3">For</p>
-          <div className="flex gap-2">
-            {(['adult', 'kids'] as const).map(seg => (
-              <button
-                key={seg}
-                type="button"
-                onClick={() => {
-                  if (seg === segment) return
-                  setSegment(seg)
-                  setItems([])
-                  if (seg === 'kids') setSelectedMl(35)
-                }}
-                className={[
-                  'flex-1 rounded-xl py-3 text-center border-2 transition-all',
-                  segment === seg
-                    ? 'border-pine bg-pine-50'
-                    : 'border-line bg-sand-50 hover:border-pine-200',
-                ].join(' ')}
-              >
-                <p className={`text-sm font-bold ${segment === seg ? 'text-pine' : 'text-ink-700'}`}>
-                  {seg === 'adult' ? 'Adult' : 'Kids'}
-                </p>
-                <p className={`text-[10px] mt-0.5 ${segment === seg ? 'text-pine-600' : 'text-ink-400'}`}>
-                  {seg === 'adult' ? '35 / 50 / 100 ml' : '35 ml only'}
-                </p>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Bottle size selector */}
-        <div className="bg-white border border-line rounded-2xl p-4">
-          <p className="text-[10px] font-semibold text-ink-400 uppercase tracking-widest mb-3">Bottle Size</p>
-          <div className="flex gap-2">
-            {SIZE_OPTIONS.filter(opt => segment === 'kids' ? opt.ml === 35 : true).map(opt => (
-              <button
-                key={opt.ml}
-                type="button"
-                onClick={() => setSelectedMl(opt.ml)}
-                className={[
-                  'flex-1 rounded-xl py-3 text-center border-2 transition-all',
-                  selectedMl === opt.ml
-                    ? 'border-pine bg-pine-50'
-                    : 'border-line bg-sand-50 hover:border-pine-200',
-                ].join(' ')}
-              >
-                <p className={`text-sm font-bold ${selectedMl === opt.ml ? 'text-pine' : 'text-ink-700'}`}>{opt.ml} ml</p>
-                <p className={`text-[10px] mt-0.5 ${selectedMl === opt.ml ? 'text-pine-600' : 'text-ink-400'}`}>{opt.grams} gram</p>
-              </button>
-            ))}
-          </div>
-        </div>
-
         {materialsError && (
-          <div className="rounded-xl border border-danger-bd bg-danger-bg px-4 py-3 text-sm text-danger">
-            {materialsError}
-          </div>
+          <div className="rounded-xl border border-danger-bd bg-danger-bg px-4 py-3 text-sm text-danger">{materialsError}</div>
         )}
 
-        {items.length === 0 && (
+        {p.items.length === 0 && (
           <div className="rounded-2xl border border-dashed border-line bg-white px-6 py-10 text-center">
             <p className="text-sm text-ink-500">No ingredients added yet</p>
             <p className="text-xs text-ink-400 mt-1">Tap the button below to start building your formula</p>
           </div>
         )}
 
-        {items.map(item => {
+        {p.items.map(item => {
           const material  = materialMap.get(item.material_id)
           const itemGrams = computeGrams(item.drops, totalDrops, targetGrams)
           return (
@@ -929,7 +994,6 @@ export function WorkshopFormClient({ initialSlotId, editToken }: Props) {
                 </button>
               </div>
 
-              {/* Drops stepper */}
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="text-[10px] font-semibold text-ink-400 uppercase tracking-wide">
@@ -948,9 +1012,7 @@ export function WorkshopFormClient({ initialSlotId, editToken }: Props) {
                     }}
                     className="w-10 h-10 flex-shrink-0 rounded-xl border border-line bg-sand-50 text-ink-700 text-lg font-semibold flex items-center justify-center hover:bg-sand-100 active:scale-95 transition-all"
                     aria-label="Decrease drops"
-                  >
-                    −
-                  </button>
+                  >−</button>
                   <input
                     type="number" min={0} step={1}
                     value={item.drops === '' ? '' : item.drops}
@@ -971,9 +1033,7 @@ export function WorkshopFormClient({ initialSlotId, editToken }: Props) {
                     }}
                     className="w-10 h-10 flex-shrink-0 rounded-xl border border-line bg-sand-50 text-ink-700 text-lg font-semibold flex items-center justify-center hover:bg-sand-100 active:scale-95 transition-all"
                     aria-label="Increase drops"
-                  >
-                    +
-                  </button>
+                  >+</button>
                 </div>
               </div>
             </div>
@@ -990,34 +1050,63 @@ export function WorkshopFormClient({ initialSlotId, editToken }: Props) {
           </svg>
           {materialsLoading ? 'Loading ingredients...' : 'Add Ingredient'}
         </button>
+
+        {/* Perfume name (optional) */}
+        <div className="bg-white border border-line rounded-2xl p-4">
+          <label className="block text-xs font-semibold text-ink-500 mb-2 uppercase tracking-wide">
+            Perfume Name <span className="text-ink-300 font-normal normal-case">(optional, max 15 chars)</span>
+          </label>
+          <input
+            type="text"
+            value={p.perfumeName}
+            onChange={e => updateP({ perfumeName: e.target.value.slice(0, 15) })}
+            placeholder="e.g. Sunset at Dago"
+            maxLength={15}
+            className={INPUT_CLS}
+          />
+          <p className={`text-[11px] mt-1 text-right ${p.perfumeName.length >= 15 ? 'text-danger' : 'text-ink-300'}`}>
+            {p.perfumeName.length}/15
+          </p>
+        </div>
+
+        {/* Per-participant submit error */}
+        {p.submitError && (
+          <div className="rounded-xl border border-danger-bd bg-danger-bg px-4 py-3 text-sm text-danger">{p.submitError}</div>
+        )}
+
+        {/* Hint: other participants not ready */}
+        {!allReady && participants.length > 1 && canSubmitOne && (
+          <p className="text-xs text-ink-400 text-center">
+            {participants.filter(pp => !(pp.step === 'formulation' && pp.items.length > 0)).length} participant(s) haven&apos;t completed their formulation yet
+          </p>
+        )}
       </div>
 
-      {/* Sticky bottom submit */}
+      {/* Sticky bottom */}
       <div className="fixed bottom-0 inset-x-0 z-20 bg-white border-t border-line px-4 py-4 pb-safe-bottom">
         <div className="max-w-md mx-auto space-y-2">
           <button
-            onClick={() => { if (canSubmit) setShowNameSheet(true) }}
-            disabled={!canSubmit || submitting}
+            onClick={handleSubmitAll}
+            disabled={!allReady || submitting}
             className="w-full py-4 rounded-2xl bg-pine text-white text-base font-semibold disabled:opacity-40 hover:bg-pine-700 active:scale-[0.98] transition-all"
           >
-            {isEdit ? 'Update Formulation' : 'Save Formulation'}
+            {submitting
+              ? 'Saving…'
+              : isEdit
+                ? 'Update Formulation'
+                : participants.length > 1
+                  ? `Save All (${participants.length} Participants)`
+                  : 'Save Formulation'}
           </button>
-          {items.length === 0 && (
-            <p className="text-xs text-ink-400 text-center">Add at least 1 ingredient first</p>
+          {!allReady && (
+            <p className="text-xs text-ink-400 text-center">
+              {!canSubmitOne
+                ? 'Add at least 1 ingredient first'
+                : 'Complete all participants\' formulations to submit'}
+            </p>
           )}
         </div>
       </div>
-
-      {/* Perfume Name Bottom Sheet */}
-      {showNameSheet && (
-        <PerfumeNameSheet
-          defaultValue={perfumeName}
-          submitting={submitting}
-          error={submitError}
-          onSubmit={(name) => { setPerfumeName(name); handleSubmit(name) }}
-          onClose={() => { setShowNameSheet(false); setSubmitError('') }}
-        />
-      )}
 
       {showPicker && (
         <MaterialPicker
