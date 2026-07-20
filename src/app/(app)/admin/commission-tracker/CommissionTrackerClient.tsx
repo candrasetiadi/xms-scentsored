@@ -242,6 +242,7 @@ export function CommissionTrackerClient({ drivers: initialDrivers, companies: in
   const [formAmount, setFormAmount]         = useState('')
   const [formAdminFee, setFormAdminFee]     = useState('')
   const [formStatus, setFormStatus]         = useState<'pending' | 'paid'>('pending')
+  const [formTransferDate, setFormTransferDate] = useState('')
   const [formNotes, setFormNotes]           = useState('')
   const [formReceiptFile, setFormReceiptFile] = useState<File | null>(null)
   const [formGuestFile, setFormGuestFile]   = useState<File | null>(null)
@@ -408,6 +409,7 @@ export function CommissionTrackerClient({ drivers: initialDrivers, companies: in
         notes: formNotes || undefined,
       }
       if (formCompanyId) body.company_id = formCompanyId
+      if (formStatus === 'paid' && formTransferDate) body.transfer_date = formTransferDate
 
       const res = await fetch('/api/v1/commission-tracker/transactions', {
         method: 'POST',
@@ -431,7 +433,7 @@ export function CommissionTrackerClient({ drivers: initialDrivers, companies: in
       setFormDriverId(''); setFormDriverInput('')
       setFormCompanyId(''); setFormCompanyInput('')
       setFormDate(today()); setFormAmount(''); setFormAdminFee('')
-      setFormStatus('pending'); setFormNotes('')
+      setFormStatus('pending'); setFormTransferDate(''); setFormNotes('')
       setFormReceiptFile(null); setFormGuestFile(null)
       // Refresh data
       fetchSummary(appliedFrom, appliedTo)
@@ -914,11 +916,17 @@ export function CommissionTrackerClient({ drivers: initialDrivers, companies: in
               </div>
               <div>
                 <label className={labelCls}>Status</label>
-                <select value={formStatus} onChange={e => setFormStatus(e.target.value as 'pending' | 'paid')} className={inputCls}>
+                <select value={formStatus} onChange={e => { setFormStatus(e.target.value as 'pending' | 'paid'); if (e.target.value === 'pending') setFormTransferDate('') }} className={inputCls}>
                   <option value="pending">Pending</option>
                   <option value="paid">Paid</option>
                 </select>
               </div>
+              {formStatus === 'paid' && (
+                <div>
+                  <label className={labelCls}>Tanggal Transfer *</label>
+                  <input type="date" value={formTransferDate} onChange={e => setFormTransferDate(e.target.value)} className={inputCls} required />
+                </div>
+              )}
             </div>
 
             <div>
