@@ -8,9 +8,9 @@ export async function POST(request: Request) {
   const { data: { user }, error: authErr } = await supabase.auth.getUser()
   if (authErr || !user) return NextResponse.json({ error: { code: 'UNAUTHORIZED' } }, { status: 401 })
 
-  const { data: staff } = await supabase
-    .from('staff').select('role').eq('auth_user_id', user.id).eq('active', true).single()
-  if (!staff || !['owner', 'admin'].includes(staff.role))
+  const { data: staff } = await (supabase as any)
+    .from('staff').select('role, can_access_commission').eq('auth_user_id', user.id).eq('active', true).single()
+  if (!staff || (!['owner', 'admin'].includes(staff.role) && !(staff as any).can_access_commission))
     return NextResponse.json({ error: { code: 'FORBIDDEN' } }, { status: 403 })
 
   let body: { name: string; fee_value?: number }
