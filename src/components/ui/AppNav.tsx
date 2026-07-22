@@ -19,6 +19,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Komisi',      href: '/admin/commissions',   roles: ['owner', 'admin'] },
   { label: 'Atribusi Driver', href: '/admin/driver-attribution', roles: ['owner', 'admin'] },
   { label: 'Commission Tracker', href: '/admin/commission-tracker', roles: ['owner', 'admin'] },
+  { label: 'Finance',     href: '/finance',              roles: ['owner', 'admin'] },
   { label: 'Laporan',     href: '/reporting',           roles: ['owner', 'admin'] },
   { label: 'Raw Mat Exp Schedule', href: '/admin/slots',    roles: ['owner', 'admin'] },
   { label: 'Raw Mat Exp Result',   href: '/admin/workshop', roles: ['owner', 'admin', 'cashier', 'perfumer', 'stock_keeper'] },

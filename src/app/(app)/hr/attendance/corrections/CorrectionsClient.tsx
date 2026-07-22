@@ -96,8 +96,8 @@ export function CorrectionsClient({ staffId, staffRole, branchId }: Props) {
   }, [tab, fetchMy, fetchAdmin])
 
   async function handleSubmit() {
-    if (!date || !clockIn || !reason.trim()) {
-      showToast('Tanggal, jam masuk, dan alasan wajib diisi.', 'error')
+    if (!date || (!clockIn && !clockOut) || !reason.trim()) {
+      showToast('Tanggal, minimal satu jam koreksi, dan alasan wajib diisi.', 'error')
       return
     }
     setSubmitting(true)
@@ -106,9 +106,9 @@ export function CorrectionsClient({ staffId, staffRole, branchId }: Props) {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({
-          date,
-          requested_in:  clockIn  || null,
-          requested_out: clockOut || null,
+          work_date:            date,
+          requested_clock_in:  clockIn  ? `${date}T${clockIn}` : null,
+          requested_clock_out: clockOut ? `${date}T${clockOut}` : null,
           reason,
         }),
       })
