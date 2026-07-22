@@ -44,14 +44,16 @@ export default async function OrderHistoryPage({
 
   const { data: orders } = await query
 
-  // Fetch customers + sales staff in parallel
+  // Fetch customers + sales staff + branch staff list (for PIC edit)
   const custIds  = [...new Set((orders ?? []).map(o => o.customer_id).filter(Boolean) as string[])]
   const salesIds = [...new Set((orders ?? []).map(o => o.sales_staff_id).filter(Boolean) as string[])]
 
-  const [{ data: customers }, { data: salesStaff }] = await Promise.all([
+  const [{ data: customers }, { data: salesStaff }, { data: branchStaff }] = await Promise.all([
     custIds.length  ? supabase.from('customers').select('id, name, phone').in('id', custIds)  : Promise.resolve({ data: [] }),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     salesIds.length ? (supabase as any).from('staff').select('id, name, nickname').in('id', salesIds) : Promise.resolve({ data: [] }),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase as any).from('staff').select('id, name, nickname').eq('branch_id', branchId).eq('active', true).order('name'),
   ])
 
   const custMap  = new Map((customers  ?? []).map((c: { id: string; name: string | null; phone: string | null }) => [c.id, c]))
@@ -74,10 +76,12 @@ export default async function OrderHistoryPage({
       branchId={branchId}
       branches={branches ?? []}
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    orders={enriched as any}
+      orders={enriched as any}
       selectedDate={selectedDate}
       statusFilter={statusFilter}
       summary={{ totalOrders: paid.length, revenue }}
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      staffList={(branchStaff ?? []) as any}
     />
   )
 }

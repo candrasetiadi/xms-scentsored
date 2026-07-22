@@ -21,23 +21,32 @@ export async function GET(
 
   if (error || !order) return NextResponse.json({ error: { code: 'NOT_FOUND' } }, { status: 404 })
 
-  // Ambil items + product name
-  const { data: items } = await supabase
+  // Ambil items + product name + pic_staff_id
+  const { data: items } = await (supabase as any)
     .from('order_items')
-    .select('id, product_id, qty, unit_price, line_total, is_custom, customization_notes')
+    .select('id, product_id, qty, unit_price, line_total, is_custom, customization_notes, size_ml, pic_staff_id')
     .eq('order_id', id)
 
-  // Ambil nama produk
-  const productIds = [...new Set((items ?? []).map(i => i.product_id))]
-  const { data: products } = productIds.length
-    ? await supabase.from('products').select('id, name, sku, type').in('id', productIds)
-    : { data: [] }
+  // Fetch products + pic staff in parallel
+  const productIds: string[] = [...new Set<string>((items ?? []).map((i: any) => i.product_id as string))]
+  const picStaffIds = [...new Set((items ?? []).map((i: any) => i.pic_staff_id).filter(Boolean) as string[])]
 
-  const productMap = new Map((products ?? []).map(p => [p.id, p]))
+  const [{ data: products }, { data: picStaff }] = await Promise.all([
+    productIds.length
+      ? supabase.from('products').select('id, name, sku, type').in('id', productIds)
+      : Promise.resolve({ data: [] }),
+    picStaffIds.length
+      ? (supabase as any).from('staff').select('id, name, nickname').in('id', picStaffIds)
+      : Promise.resolve({ data: [] }),
+  ])
 
-  const enrichedItems = (items ?? []).map(item => ({
+  const productMap  = new Map((products ?? []).map((p: any) => [p.id, p]))
+  const picStaffMap = new Map((picStaff ?? []).map((s: any) => [s.id, s]))
+
+  const enrichedItems = (items ?? []).map((item: any) => ({
     ...item,
-    product: productMap.get(item.product_id) ?? null,
+    product:   productMap.get(item.product_id)   ?? null,
+    pic_staff: item.pic_staff_id ? picStaffMap.get(item.pic_staff_id) ?? null : null,
   }))
 
   // Customer + driver (opsional)

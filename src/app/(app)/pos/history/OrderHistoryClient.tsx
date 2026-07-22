@@ -2,9 +2,15 @@
 
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 
 type OrderStatus = 'draft' | 'awaiting_payment' | 'paid' | 'in_production' | 'ready' | 'completed' | 'cancelled'
+
+interface StaffOption {
+  id:       string
+  name:     string
+  nickname: string | null
+}
 
 interface OrderItem {
   id:                  string
@@ -14,6 +20,8 @@ interface OrderItem {
   line_total:          number
   is_custom:           boolean
   customization_notes: string | null
+  pic_staff_id:        string | null
+  pic_staff:           StaffOption | null
   product:             { name: string; sku: string; type: string } | null
 }
 
@@ -39,6 +47,7 @@ interface Props {
   selectedDate: string
   statusFilter: string
   summary:      { totalOrders: number; revenue: number }
+  staffList:    StaffOption[]
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -85,12 +94,56 @@ function ChevronIcon({ open }: { open: boolean }) {
 
 // ── Item detail panel (shared between mobile + desktop) ───────────────────────
 
-function ItemDetail({ items, discount, total, loading }: {
-  items:    OrderItem[] | null
-  discount: number
-  total:    number
-  loading:  boolean
+function PencilIcon() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor"
+      strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M8.5 1.5L10.5 3.5L4 10H2V8L8.5 1.5Z" />
+    </svg>
+  )
+}
+
+function ItemDetail({ items: itemsProp, discount, total, loading, orderId, staffRole, staffList, onItemsChange }: {
+  items:          OrderItem[] | null
+  discount:       number
+  total:          number
+  loading:        boolean
+  orderId:        string
+  staffRole:      string
+  staffList:      StaffOption[]
+  onItemsChange:  (items: OrderItem[]) => void
 }) {
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [saving,    setSaving]    = useState<string | null>(null)
+  const [items,     setItems]     = useState<OrderItem[] | null>(itemsProp)
+
+  useEffect(() => { setItems(itemsProp) }, [itemsProp])
+
+  const canEditPic = ['owner', 'admin', 'cashier'].includes(staffRole)
+
+  async function handlePicChange(itemId: string, staffId: string) {
+    const picStaffId = staffId === '' ? null : staffId
+    setSaving(itemId)
+    try {
+      const res = await fetch(`/api/v1/orders/${orderId}/items/${itemId}/pic`, {
+        method:  'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ pic_staff_id: picStaffId }),
+      })
+      if (!res.ok) throw new Error('Gagal menyimpan PIC.')
+      const picStaff = picStaffId ? staffList.find(s => s.id === picStaffId) ?? null : null
+      const updated  = (items ?? []).map(i =>
+        i.id === itemId ? { ...i, pic_staff_id: picStaffId, pic_staff: picStaff } : i
+      )
+      setItems(updated)
+      onItemsChange(updated)
+    } catch { /* silent — select reverts since items state unchanged on error */ }
+    finally {
+      setSaving(null)
+      setEditingId(null)
+    }
+  }
+
   if (loading) return (
     <div className="py-5 text-center text-xs text-ink-400 animate-pulse">Memuat detail…</div>
   )
@@ -99,32 +152,78 @@ function ItemDetail({ items, discount, total, loading }: {
   )
   return (
     <div className="divide-y divide-line">
-      {items.map(item => (
-        <div key={item.id} className="flex items-start justify-between gap-3 py-2.5 px-3">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-xs font-semibold text-ink-900">{item.product?.name ?? '—'}</span>
-              {item.is_custom && (
-                <span className="text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full">
-                  Custom
-                </span>
-              )}
+      {items.map(item => {
+        const picLabel = item.pic_staff?.nickname ?? item.pic_staff?.name ?? null
+        const isEditing = editingId === item.id
+        const isSaving  = saving === item.id
+
+        return (
+          <div key={item.id} className="py-2.5 px-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-xs font-semibold text-ink-900">{item.product?.name ?? '—'}</span>
+                  {item.is_custom && (
+                    <span className="text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full">
+                      Custom
+                    </span>
+                  )}
+                </div>
+                {item.customization_notes && (
+                  <p className="text-[10px] text-ink-400 mt-0.5 leading-snug">{item.customization_notes}</p>
+                )}
+                <p className="text-[10px] text-ink-400 mt-0.5 font-mono">{item.product?.sku ?? ''}</p>
+
+                {/* PIC per item */}
+                <div className="flex items-center gap-1.5 mt-1">
+                  {isEditing ? (
+                    <select
+                      autoFocus
+                      disabled={isSaving}
+                      defaultValue={item.pic_staff_id ?? ''}
+                      onChange={e => handlePicChange(item.id, e.target.value)}
+                      onBlur={() => setEditingId(null)}
+                      className="h-6 rounded border border-pine-300 bg-white text-[11px] text-ink-900 px-1.5 focus:outline-none focus:ring-1 focus:ring-pine-400 disabled:opacity-50"
+                    >
+                      <option value="">— Tanpa PIC —</option>
+                      {staffList.map(s => (
+                        <option key={s.id} value={s.id}>
+                          {s.nickname ?? s.name}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <>
+                      <span className="text-[10px] text-ink-400">PIC:</span>
+                      <span className={`text-[10px] font-semibold ${picLabel ? 'text-pine' : 'text-ink-300'}`}>
+                        {picLabel ?? '—'}
+                      </span>
+                      {canEditPic && (
+                        <button
+                          onClick={() => setEditingId(item.id)}
+                          className="text-ink-300 hover:text-pine transition-colors ml-0.5"
+                          aria-label="Edit PIC"
+                        >
+                          <PencilIcon />
+                        </button>
+                      )}
+                    </>
+                  )}
+                  {isSaving && <span className="text-[10px] text-ink-400 animate-pulse">Menyimpan…</span>}
+                </div>
+              </div>
+              <div className="flex items-start gap-2 shrink-0">
+                <div className="text-right">
+                  <p className="text-xs tabular-nums text-ink-900 font-semibold">{formatRp(item.line_total)}</p>
+                  <p className="text-[10px] tabular-nums text-ink-400 mt-0.5">
+                    {item.qty} × {formatRp(item.unit_price)}
+                  </p>
+                </div>
+              </div>
             </div>
-            {item.customization_notes && (
-              <p className="text-[10px] text-ink-400 mt-0.5 leading-snug">{item.customization_notes}</p>
-            )}
-            <p className="text-[10px] text-ink-400 mt-0.5 font-mono">{item.product?.sku ?? ''}</p>
           </div>
-          <div className="flex items-start gap-2 shrink-0">
-            <div className="text-right">
-              <p className="text-xs tabular-nums text-ink-900 font-semibold">{formatRp(item.line_total)}</p>
-              <p className="text-[10px] tabular-nums text-ink-400 mt-0.5">
-                {item.qty} × {formatRp(item.unit_price)}
-              </p>
-            </div>
-          </div>
-        </div>
-      ))}
+        )
+      })}
       {discount > 0 && (
         <div className="flex justify-between px-3 py-2 bg-sand-50">
           <span className="text-xs text-ink-500">Diskon</span>
@@ -185,9 +284,10 @@ function OrderActions({ order, staffRole, cancelling, resending, msg, onCancel, 
 
 // ── Mobile card ───────────────────────────────────────────────────────────────
 
-function MobileOrderCard({ order, staffRole, cancelling, resending, msg, onCancel, onResend }: {
+function MobileOrderCard({ order, staffRole, staffList, cancelling, resending, msg, onCancel, onResend }: {
   order:      Order
   staffRole:  string
+  staffList:  StaffOption[]
   cancelling: string | null
   resending:  string | null
   msg:        { id: string; text: string; ok: boolean } | null
@@ -274,6 +374,8 @@ function MobileOrderCard({ order, staffRole, cancelling, resending, msg, onCance
         <div className="border-t border-line bg-sand-50/50">
           <ItemDetail
             items={items} discount={order.discount} total={order.total} loading={loading}
+            orderId={order.id} staffRole={staffRole} staffList={staffList}
+            onItemsChange={setItems}
           />
           <div className="px-4 py-3 border-t border-line" onClick={e => e.stopPropagation()}>
             <OrderActions
@@ -290,9 +392,10 @@ function MobileOrderCard({ order, staffRole, cancelling, resending, msg, onCance
 
 // ── Desktop expandable row ────────────────────────────────────────────────────
 
-function DesktopOrderRow({ order, staffRole, cancelling, resending, msg, onCancel, onResend }: {
+function DesktopOrderRow({ order, staffRole, staffList, cancelling, resending, msg, onCancel, onResend }: {
   order:      Order
   staffRole:  string
+  staffList:  StaffOption[]
   cancelling: string | null
   resending:  string | null
   msg:        { id: string; text: string; ok: boolean } | null
@@ -379,6 +482,8 @@ function DesktopOrderRow({ order, staffRole, cancelling, resending, msg, onCance
             <div className="border border-line rounded-xl overflow-hidden mt-2 bg-white">
               <ItemDetail
                 items={items} discount={order.discount} total={order.total} loading={loading}
+                orderId={order.id} staffRole={staffRole} staffList={staffList}
+                onItemsChange={setItems}
               />
             </div>
             <div className="mt-3 flex items-center gap-2" onClick={e => e.stopPropagation()}>
@@ -398,7 +503,7 @@ function DesktopOrderRow({ order, staffRole, cancelling, resending, msg, onCance
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 export function OrderHistoryClient({
-  staffRole, branchId, branches, orders, selectedDate, statusFilter, summary,
+  staffRole, branchId, branches, orders, selectedDate, statusFilter, summary, staffList,
 }: Props) {
   const router   = useRouter()
   const pathname = usePathname()
@@ -435,7 +540,7 @@ export function OrderHistoryClient({
     setMsg({ id: orderId, text: res.ok ? 'Invoice WA diantrikan ulang.' : json.error?.message ?? 'Gagal.', ok: res.ok })
   }
 
-  const sharedProps = { staffRole, cancelling, resending, msg, onCancel: handleCancel, onResend: handleResendInvoice }
+  const sharedProps = { staffRole, staffList, cancelling, resending, msg, onCancel: handleCancel, onResend: handleResendInvoice }
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-6">
