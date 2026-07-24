@@ -44,7 +44,13 @@ function formatDateTime(iso: string) {
   })
 }
 
-const PAYMENT_LABEL: Record<string, string> = { cash: 'Tunai', qris: 'QRIS' }
+const PAYMENT_LABEL: Record<string, string> = {
+  cash:          'Tunai',
+  qris:          'QRIS',
+  debit_card:    'Kartu Debit',
+  credit_card:   'Kartu Kredit',
+  bank_transfer: 'Transfer Bank',
+}
 
 export function ReceiptPrintClient({ data }: { data: ReceiptData }) {
   const { order, branch, customer, driver, staff, payment, items } = data
@@ -266,7 +272,21 @@ export function ReceiptPrintClient({ data }: { data: ReceiptData }) {
             padding: 0;
             box-shadow: none;
             font-size: 10pt;
+            font-weight: 600;
+            -webkit-text-stroke: 0.3px currentColor;
           }
+
+          .receipt-brand,
+          .receipt-brand-sm,
+          .receipt-bold,
+          .receipt-total,
+          .receipt-item-name {
+            font-weight: 800;
+            -webkit-text-stroke: 0.45px currentColor;
+          }
+
+          .receipt-divider        { border-top-width: 1.5px; }
+          .receipt-divider-dashed { border-top-width: 1.5px; }
 
           .receipt-brand { font-size: 14pt; }
           .receipt-total { font-size: 12pt; }

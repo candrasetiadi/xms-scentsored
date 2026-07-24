@@ -294,8 +294,8 @@ async function main() {
         fee_pct:       row.feePct,
         calculated_at: new Date().toISOString(),
       } : null,
-      status:        'paid',
-      transfer_date: row.date,
+      status:        row.payMethod?.toUpperCase() === 'TRANSFER' ? 'paid' : 'pending',
+      transfer_date: row.payMethod?.toUpperCase() === 'TRANSFER' ? row.date : null,
       transfer_note: row.payMethod || null,
       edit_history:  [],
     }
